@@ -1,0 +1,144 @@
+/**
+ * 大连私人家教中心 · 全局样式与设计令牌
+ *
+ * 设计基调：清爽的教育蓝 + 青绿点缀，暖金强调；
+ * 走「专业、亲切、可信赖」的家教服务机构路线。
+ */
+:root {
+  /* 品牌色 */
+  --brand-color: #2f7cf6;
+  --brand-color-dark: #1f5fd0;
+  --brand-color-light: #e9f1fe;
+  --accent-color: #ffb020;
+  --accent-color-light: #fff4dc;
+  --brand-gradient: linear-gradient(135deg, #2f7cf6 0%, #22c1a6 100%);
+
+  /* 文字 */
+  --text-main: #1c2333;
+  --text-secondary: #5b6478;
+  --text-tertiary: #97a0b3;
+  --text-inverse: #ffffff;
+
+  /* 背景与描边 */
+  --bg-page: #ffffff;
+  --bg-subtle: #f6f8fc;
+  --bg-sunken: #eef2f9;
+  --border-color: #e6eaf2;
+  --border-strong: #d4dbe8;
+
+  /* 语义色 */
+  --success-color: #16a34a;
+  --warning-color: #d97706;
+  --danger-color: #dc2626;
+
+  /* 圆角与投影 */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 3px rgba(28, 35, 51, 0.06);
+  --shadow-md: 0 8px 24px rgba(28, 35, 51, 0.08);
+  --shadow-lg: 0 20px 52px rgba(28, 35, 51, 0.12);
+
+  /* 布局 */
+  --container-width: 1160px;
+  --header-height: 68px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: var(--text-main);
+  background-color: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ---------- 通用布局容器 ---------- */
+
+.container {
+  width: 100%;
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.section {
+  padding: 92px 0;
+}
+
+.section--subtle {
+  background: var(--bg-subtle);
+}
+
+.section-head {
+  text-align: center;
+  margin-bottom: 54px;
+}
+
+.section-eyebrow {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--brand-color);
+  background: var(--brand-color-light);
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+}
+
+.section-desc {
+  font-size: 16px;
+  color: var(--text-secondary);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* ---------- Element Plus 本地化微调 ---------- */
+
+.el-button {
+  font-weight: 500;
+}
+
+.el-button--large {
+  --el-button-size: 46px;
+  padding: 0 28px;
+}
+
+@media (max-width: 768px) {
+  .section {
+    padding: 60px 0;
+  }
+
+  .section-title {
+    font-size: 26px;
+  }
+}
