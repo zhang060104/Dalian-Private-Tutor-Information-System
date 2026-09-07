@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { SwitchButton } from '@element-plus/icons-vue'
 import { useSystemStore } from '@/stores/system'
+import { decodeGrades, decodeSubjects, scheduleSummary } from '@/utils/availability'
 
 /**
  * 独立管理后台（/admin）
@@ -60,6 +61,12 @@ function statusTag(p: PairView) {
   if (p.status === 'matched') return { type: 'success' as const, text: '✓ 已匹配' }
   if (p.status === 'teacher-only') return { type: 'warning' as const, text: '老师发起' }
   return { type: 'primary' as const, text: '学生发起' }
+}
+
+/** 空余时间紧凑摘要：'周一 08:00-11:00；周二 14:00-16:00 …' */
+function schedCompact(availability?: number[]): string {
+  const busy = scheduleSummary(availability).filter((x) => !x.includes('无空闲'))
+  return busy.length ? busy.join('；') : '未填写'
 }
 
 function logout() {
@@ -128,20 +135,23 @@ function logout() {
               <el-table-column label="姓名" width="120">
                 <template #default="{ row }">{{ row.name }}（{{ row.gender }}）</template>
               </el-table-column>
-              <el-table-column label="主教科目" min-width="150">
+              <el-table-column label="主教科目" min-width="140">
                 <template #default="{ row }">
-                  <el-tag v-for="s in row.subjects" :key="s" size="small" effect="plain">{{ s }}</el-tag>
+                  <el-tag v-for="s in decodeSubjects(row.subjects)" :key="s" size="small" effect="plain">{{ s }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="可教年级" min-width="160">
+              <el-table-column label="可教年级" min-width="150">
                 <template #default="{ row }">
-                  <el-tag v-for="g in row.grades" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
+                  <el-tag v-for="g in decodeGrades(row.grades)" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column prop="years" label="教龄" width="80" />
               <el-table-column prop="education" label="学历" min-width="140" />
               <el-table-column prop="pricePerHour" label="课时费" width="110">
                 <template #default="{ row }">¥{{ row.pricePerHour }}/小时</template>
+              </el-table-column>
+              <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
+                <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
               </el-table-column>
               <el-table-column prop="phone" label="电话" width="130" />
               <el-table-column prop="createdAt" label="入驻时间" width="170">
@@ -157,7 +167,12 @@ function logout() {
                 <template #default="{ row }">{{ row.name }}（{{ row.gender }}）</template>
               </el-table-column>
               <el-table-column prop="grade" label="年级" width="130" />
-              <el-table-column prop="subject" label="辅导科目" width="130" />
+              <el-table-column label="辅导科目" min-width="120">
+                <template #default="{ row }">{{ decodeSubjects(row.subjects).join('、') || '未选' }}</template>
+              </el-table-column>
+              <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
+                <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
+              </el-table-column>
               <el-table-column prop="guardian" label="家长" width="140" />
               <el-table-column prop="phone" label="电话" width="130" />
               <el-table-column prop="note" label="备注" min-width="160" />

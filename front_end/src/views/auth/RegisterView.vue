@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useSystemStore, ROLE_HOME } from '@/stores/system'
 import { GRADE_OPTIONS, SUBJECT_OPTIONS } from '@/data/tutors'
+import { encodeGrades, encodeSubjects } from '@/utils/availability'
+import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import type { Role } from '@/types'
 
 /** 老师/学生入驻：注册账号 + 填写个人信息（演示模式，数据存 localStorage） */
@@ -35,6 +37,8 @@ const form = reactive({
   subject: '',
   guardian: '',
   note: '',
+  // 一周空余时间：7 个 int（0=周一…6=周日，低 24 位=当天 0-23 点是否有空）
+  availability: [0, 0, 0, 0, 0, 0, 0] as number[],
 })
 
 const submitting = ref(false)
@@ -78,12 +82,13 @@ async function submit() {
         name: form.name.trim(),
         gender: form.gender,
         phone: form.phone.trim(),
-        subjects: [...form.subjects],
-        grades: [...form.grades],
+        subjects: encodeSubjects(form.subjects),
+        grades: encodeGrades(form.grades),
         years: form.years,
         education: form.education.trim(),
         intro: form.intro.trim(),
         pricePerHour: form.pricePerHour,
+        availability: [...form.availability],
       })
     } else {
       store.registerStudent({
@@ -93,9 +98,10 @@ async function submit() {
         gender: form.gender,
         phone: form.phone.trim(),
         grade: form.grade,
-        subject: form.subject,
+        subjects: encodeSubjects([form.subject]),
         guardian: form.guardian.trim(),
         note: form.note.trim() || undefined,
+        availability: [...form.availability],
       })
     }
     // 入驻成功自动登录进入对应工作台
@@ -225,6 +231,11 @@ async function submit() {
             <el-input v-model="form.note" type="textarea" :rows="2" maxlength="200" show-word-limit placeholder="期望上课时间、学习情况等" />
           </el-form-item>
         </template>
+
+        <!-- ===== 一周空余时间（老师/学生都需要） ===== -->
+        <el-form-item label="一周空余时间（点选你有空的时段，可多选）">
+          <ScheduleEditor v-model="form.availability" />
+        </el-form-item>
 
         <el-button class="reg-submit" type="primary" size="large" :loading="submitting" @click="submit">
           提交入驻信息
