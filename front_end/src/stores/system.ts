@@ -44,9 +44,9 @@ function seedData(): { users: AnyAccount[]; relations: MatchRelation[] } {
     {
       username: 'teacher1', password: '123456', role: 'teacher', name: '张明', gender: '男',
       phone: '13800000001', createdAt: t,
-      subjects: encodeSubjects(['数学', '奥数']),
+      subjects: encodeSubjects(['数学']),
       grades: encodeGrades(['初一', '初二', '初三']),
-      years: 6, education: '辽宁师范大学 本科', intro: '专注中考数学提分，耐心细致，带过 200+ 学生。', pricePerHour: 180,
+      intro: '专注中考数学提分，耐心细致，带过 200+ 学生。',
       availability: weekdaysTemplate(),
     },
     {
@@ -54,7 +54,7 @@ function seedData(): { users: AnyAccount[]; relations: MatchRelation[] } {
       phone: '13800000002', createdAt: t,
       subjects: encodeSubjects(['英语']),
       grades: encodeGrades(['小学', '初一', '初二']),
-      years: 4, education: '大连外国语大学 硕士', intro: '少儿英语启蒙与应试结合，课堂活泼。', pricePerHour: 160,
+      intro: '少儿英语启蒙与应试结合，课堂活泼。',
       availability: [encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15])],
     },
     {
@@ -62,7 +62,7 @@ function seedData(): { users: AnyAccount[]; relations: MatchRelation[] } {
       phone: '13800000003', createdAt: t,
       subjects: encodeSubjects(['物理', '数学']),
       grades: encodeGrades(['高一', '高二', '高三']),
-      years: 8, education: '大连理工大学 本科', intro: '高中物理竞赛辅导经验，擅长体系化教学。', pricePerHour: 220,
+      intro: '高中物理竞赛辅导经验，擅长体系化教学。',
       availability: weekdaysTemplate(),
     },
     {

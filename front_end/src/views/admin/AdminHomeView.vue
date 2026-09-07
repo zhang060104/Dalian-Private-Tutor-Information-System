@@ -145,11 +145,6 @@ function logout() {
                   <el-tag v-for="g in decodeGrades(row.grades)" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="years" label="教龄" width="80" />
-              <el-table-column prop="education" label="学历" min-width="140" />
-              <el-table-column prop="pricePerHour" label="课时费" width="110">
-                <template #default="{ row }">¥{{ row.pricePerHour }}/小时</template>
-              </el-table-column>
               <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
               </el-table-column>

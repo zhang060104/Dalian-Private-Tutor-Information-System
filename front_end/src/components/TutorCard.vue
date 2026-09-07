@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { StarFilled, Clock, Reading, Medal } from '@element-plus/icons-vue'
+import { StarFilled, Medal } from '@element-plus/icons-vue'
 import type { Tutor } from '@/types'
 
 const props = defineProps<{
@@ -31,9 +31,7 @@ const avatarText = computed(() => props.tutor.name.slice(0, 1))
     </div>
 
     <div class="meta-row">
-      <span class="meta-item"><el-icon><Reading /></el-icon>{{ tutor.education }}</span>
-      <span class="meta-item"><el-icon><Clock /></el-icon>教龄 {{ tutor.years }} 年</span>
-      <span class="meta-item"><el-icon><Medal /></el-icon>授课 {{ (tutor.taughtHours / 100).toFixed(1) }}k+ 小时</span>
+      <span class="meta-item"><el-icon><Medal /></el-icon>累计授课 {{ (tutor.taughtHours / 100).toFixed(1) }}k+ 小时</span>
     </div>
 
     <p class="intro">{{ tutor.intro }}</p>
@@ -50,10 +48,6 @@ const avatarText = computed(() => props.tutor.name.slice(0, 1))
     </div>
 
     <div class="card-foot">
-      <div class="price">
-        <span class="price-num">¥{{ tutor.pricePerHour }}</span>
-        <span class="price-unit">/小时起</span>
-      </div>
       <div class="mode">
         <span v-for="m in tutor.mode" :key="m" class="mode-chip">{{ m }}</span>
       </div>
@@ -177,20 +171,9 @@ const avatarText = computed(() => props.tutor.name.slice(0, 1))
   margin-top: auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   border-top: 1px dashed var(--border-color);
   padding-top: 12px;
-}
-
-.price-num {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--brand-color-dark);
-}
-
-.price-unit {
-  font-size: 12px;
-  color: var(--text-tertiary);
 }
 
 .mode {

@@ -28,10 +28,7 @@ const form = reactive({
   // 老师
   subjects: [] as string[],
   grades: [] as string[],
-  years: 1,
-  education: '',
   intro: '',
-  pricePerHour: 100,
   // 学生
   grade: '',
   subject: '',
@@ -57,7 +54,6 @@ function validate(): string {
   if (isTeacher.value) {
     if (!form.subjects.length) return '请选择主教科目'
     if (!form.grades.length) return '请选择可教年级'
-    if (!form.education.trim()) return '请填写学历背景'
     if (!form.intro.trim()) return '请填写个人简介'
   } else {
     if (!form.grade) return '请选择学生年级'
@@ -84,10 +80,7 @@ async function submit() {
         phone: form.phone.trim(),
         subjects: encodeSubjects(form.subjects),
         grades: encodeGrades(form.grades),
-        years: form.years,
-        education: form.education.trim(),
         intro: form.intro.trim(),
-        pricePerHour: form.pricePerHour,
         availability: [...form.availability],
       })
     } else {
@@ -129,7 +122,7 @@ async function submit() {
           我是老师 · 入驻授课
         </button>
         <button type="button" class="reg-role" :class="{ active: !isTeacher }" @click="switchRole('student')">
-          我是学生 / 家长 · 入驻找家教
+          我是学生 / 家长 · 入驻找老师
         </button>
       </div>
 
@@ -182,23 +175,6 @@ async function submit() {
               <el-checkbox v-for="g in GRADE_OPTIONS" :key="g" :value="g" border>{{ g }}</el-checkbox>
             </el-checkbox-group>
           </el-form-item>
-          <el-row :gutter="14">
-            <el-col :span="8">
-              <el-form-item label="教龄（年）">
-                <el-input-number v-model="form.years" :min="0" :max="40" style="width: 100%" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="课时费（元/小时）">
-                <el-input-number v-model="form.pricePerHour" :min="50" :max="1000" :step="10" style="width: 100%" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="学历背景" required>
-                <el-input v-model="form.education" placeholder="如：大连理工大学 本科" />
-              </el-form-item>
-            </el-col>
-          </el-row>
           <el-form-item label="个人简介（教学经验 / 风格）" required>
             <el-input v-model="form.intro" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="一句话介绍自己，帮助学生了解你" />
           </el-form-item>

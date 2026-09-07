@@ -13,16 +13,10 @@ export interface Tutor {
   subjects: string[]
   /** 可教年级段 */
   grades: string[]
-  /** 教龄（年） */
-  years: number
-  /** 学历背景 */
-  education: string
   /** 一句话简介 */
   intro: string
   /** 授课方式：上门 / 在线 */
   mode: ('上门' | '在线')[]
-  /** 课时费（元/小时） */
-  pricePerHour: number
   /** 评分（0-5） */
   rating: number
   /** 累计授课（小时） */
@@ -31,28 +25,10 @@ export interface Tutor {
   tags: string[]
 }
 
-/** 找家教需求表单 */
-export interface TutorRequest {
-  /** 家长称呼 */
-  parentName: string
-  /** 联系电话/微信 */
-  contact: string
-  /** 学生年级 */
-  grade: string
-  /** 辅导科目 */
-  subject: string
-  /** 授课方式 */
-  mode: '上门' | '在线' | '均可'
-  /** 期望上课时间 */
-  schedule: string
-  /** 补充说明 */
-  remark?: string
-}
-
 /** 中心联系方式（集中维护，便于替换真实信息） */
 export const CENTER_CONTACT = {
   name: '大连私人家教中心',
-  slogan: '严选师资 · 免费试听 · 按次付费',
+  slogan: '严选师资 · 双向选择 · 定金保障',
   phone: '0411-8888-6666',
   serviceTime: '周一至周日 8:00 - 21:00',
   email: 'contact@tutor-dalian.example.com',
@@ -90,10 +66,7 @@ export interface TeacherAccount extends AccountBase {
   subjects: number
   /** 可教年级：GRADE_OPTIONS 下标位掩码（bit i = GRADE_OPTIONS[i] 选中） */
   grades: number
-  years: number
-  education: string
   intro: string
-  pricePerHour: number
   /** 一周空余时间（7 个 int，见 WeekAvailability） */
   availability: WeekAvailability
 }
