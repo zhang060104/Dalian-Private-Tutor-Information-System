@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { Phone, ChatDotRound } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Phone, ChatDotRound, SwitchButton } from '@element-plus/icons-vue'
 import { CENTER_CONTACT } from '@/types'
+import { useSystemStore } from '@/stores/system'
 
 const route = useRoute()
+const router = useRouter()
+const store = useSystemStore()
 
 const NAV_ITEMS = [
   { path: '/', label: '首页' },
@@ -15,6 +19,21 @@ const NAV_ITEMS = [
 
 const activePath = computed(() => route.path)
 const mobileMenuOpen = ref(false)
+
+/** 顶栏登录态（管理员不展示门户入口，其后台为独立 /admin） */
+const loggedIn = computed(() => !!store.current)
+const roleHomePath = computed(() => {
+  const role = store.current?.role
+  if (role === 'teacher') return '/teacher/home'
+  if (role === 'student') return '/student/home'
+  return ''
+})
+
+function logout() {
+  store.logout()
+  ElMessage.success('已退出登录')
+  router.push('/')
+}
 </script>
 
 <template>
@@ -44,6 +63,18 @@ const mobileMenuOpen = ref(false)
             <el-icon><Phone /></el-icon>
             <span>{{ CENTER_CONTACT.phone }}</span>
           </a>
+
+          <!-- 登录态区域 -->
+          <template v-if="loggedIn && store.current">
+            <span class="header-user">{{ store.current?.name }}</span>
+            <el-tag size="small" effect="plain" round>{{ store.roleLabel }}</el-tag>
+            <router-link v-if="roleHomePath" :to="roleHomePath" class="header-mypanel">我的面板</router-link>
+            <button class="header-logout" type="button" title="退出登录" @click="logout">
+              <el-icon><SwitchButton /></el-icon>
+            </button>
+          </template>
+          <router-link v-else to="/login" class="header-login">登录 / 入驻</router-link>
+
           <router-link to="/contact" class="cta-btn">免费预约试听</router-link>
           <button class="menu-toggle" aria-label="菜单" @click="mobileMenuOpen = !mobileMenuOpen">
             <span></span><span></span><span></span>
@@ -62,6 +93,12 @@ const mobileMenuOpen = ref(false)
         >
           {{ item.label }}
         </router-link>
+        <template v-if="loggedIn && store.current">
+          <router-link v-if="roleHomePath" :to="roleHomePath" class="mobile-link" @click="mobileMenuOpen = false">
+            我的面板（{{ store.current?.name }} · {{ store.roleLabel }}）
+          </router-link>
+        </template>
+        <router-link v-else to="/login" class="mobile-link" @click="mobileMenuOpen = false">登录 / 入驻</router-link>
       </div>
     </header>
 
@@ -380,6 +417,66 @@ const mobileMenuOpen = ref(false)
   .footer-grid {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+}
+
+/* ---------- 顶栏登录态 ---------- */
+.header-user {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.header-mypanel {
+  font-size: 13px;
+  color: var(--brand-color);
+  font-weight: 600;
+}
+
+.header-mypanel:hover {
+  text-decoration: underline;
+}
+
+.header-login {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--brand-color);
+  border: 1px solid var(--brand-color);
+  padding: 6px 14px;
+  border-radius: 999px;
+  transition: all 0.15s;
+}
+
+.header-login:hover {
+  background: var(--brand-color);
+  color: #fff;
+}
+
+.header-logout {
+  border: none;
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.header-logout:hover {
+  background: #fde8e8;
+  color: var(--danger-color);
+}
+
+@media (max-width: 900px) {
+  .header-user,
+  .header-mypanel,
+  .header-login,
+  .header-logout {
+    display: none;
   }
 }
 </style>

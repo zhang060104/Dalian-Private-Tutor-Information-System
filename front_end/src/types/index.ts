@@ -59,3 +59,63 @@ export const CENTER_CONTACT = {
   address: '大连市（各区分中心，详情电话咨询）',
   wechat: 'dalian-tutor',
 }
+
+/* ==================== 角色账号体系（老师 / 学生 / 管理员） ==================== */
+
+/** 系统角色 */
+export type Role = 'admin' | 'teacher' | 'student'
+
+/** 账号基类 */
+export interface AccountBase {
+  username: string
+  password: string
+  role: Role
+  name: string
+  phone: string
+  createdAt: string
+}
+
+/** 老师账号（入驻资料） */
+export interface TeacherAccount extends AccountBase {
+  role: 'teacher'
+  gender: '男' | '女'
+  subjects: string[]
+  grades: string[]
+  years: number
+  education: string
+  intro: string
+  pricePerHour: number
+}
+
+/** 学生账号（入驻资料） */
+export interface StudentAccount extends AccountBase {
+  role: 'student'
+  gender: '男' | '女'
+  grade: string
+  subject: string
+  guardian: string
+  note?: string
+}
+
+/** 管理员账号 */
+export interface AdminAccount extends AccountBase {
+  role: 'admin'
+}
+
+export type AnyAccount = AdminAccount | TeacherAccount | StudentAccount
+
+/** 师生双向选择关系（老师选学生 / 学生选老师） */
+export interface MatchRelation {
+  teacherUsername: string
+  studentUsername: string
+  /** 发起方：teacher=老师选择了学生；student=学生选择了老师 */
+  by: 'teacher' | 'student'
+  createdAt: string
+}
+
+/** 角色中文名 */
+export const ROLE_LABEL: Record<Role, string> = {
+  admin: '管理员',
+  teacher: '老师',
+  student: '学生',
+}
