@@ -2,7 +2,6 @@
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Reading, User, Lock } from '@element-plus/icons-vue'
 import { useSystemStore, ROLE_HOME } from '@/stores/system'
 import type { Role } from '@/types'
 
@@ -10,20 +9,21 @@ const store = useSystemStore()
 const route = useRoute()
 const router = useRouter()
 
-const roleTabs: Array<{ role: Role; label: string; icon: string }> = [
+/** 公共登录页仅面向老师/学生；管理员登录走独立后台 /admin（门户不设任何入口） */
+type PortalRole = Exclude<Role, 'admin'>
+
+const roleTabs: Array<{ role: PortalRole; label: string; icon: string }> = [
   { role: 'teacher', label: '老师登录', icon: 'User' },
   { role: 'student', label: '学生登录', icon: 'Reading' },
-  { role: 'admin', label: '管理员登录', icon: 'Lock' },
 ]
 
 /** 演示账号（前端演示模式，接入后端后移除） */
-const DEMO: Record<Role, { username: string; password: string; tip: string }> = {
+const DEMO: Record<PortalRole, { username: string; password: string; tip: string }> = {
   teacher: { username: 'teacher1', password: '123456', tip: '老师（张明 · 数学）' },
   student: { username: 'student1', password: '123456', tip: '学生（王小雨 · 初二）' },
-  admin: { username: 'admin', password: '123456', tip: '管理员（独立后台 /admin）' },
 }
 
-const activeRole = ref<Role>('teacher')
+const activeRole = ref<PortalRole>('teacher')
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 
@@ -50,7 +50,7 @@ async function submit() {
   }
 }
 
-function switchRole(role: Role) {
+function switchRole(role: PortalRole) {
   activeRole.value = role
   form.username = ''
   form.password = ''
@@ -63,7 +63,7 @@ function switchRole(role: Role) {
       <div class="auth-head">
         <div class="auth-logo">教</div>
         <h2 class="auth-title">大连私人家教中心 · 登录</h2>
-        <p class="auth-sub">老师 / 学生 / 管理员分角色登录</p>
+        <p class="auth-sub">老师 / 学生分角色登录</p>
       </div>
 
       <div class="auth-roles">
@@ -106,14 +106,10 @@ function switchRole(role: Role) {
 
       <div class="auth-foot">
         <span>还没有账号？</span>
-        <router-link :to="{ path: '/register', query: { role: activeRole === 'admin' ? 'teacher' : activeRole } }">
+        <router-link :to="{ path: '/register', query: { role: activeRole } }">
           老师 / 学生入驻（填写个人信息）
         </router-link>
       </div>
-
-      <p v-if="activeRole === 'admin'" class="auth-admin-note">
-        管理员登录后进入独立管理后台（地址 /admin，门户页面不设任何跳转入口）
-      </p>
     </div>
   </div>
 </template>
@@ -235,15 +231,5 @@ function switchRole(role: Role) {
 .auth-foot a {
   color: var(--brand-color);
   font-weight: 600;
-}
-
-.auth-admin-note {
-  margin-top: 14px;
-  padding: 8px 12px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #a05e03;
-  background: var(--accent-color-light);
-  border-radius: var(--radius-sm);
 }
 </style>
