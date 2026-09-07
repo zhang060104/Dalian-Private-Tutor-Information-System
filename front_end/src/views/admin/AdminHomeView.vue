@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { SwitchButton } from '@element-plus/icons-vue'
@@ -72,7 +72,33 @@ function schedCompact(availability?: number[]): string {
 function logout() {
   store.logout()
   ElMessage.success('已退出登录')
-  router.replace('/login')
+  // 留在 /admin：退出后原地展示管理员登录卡（公共登录页不设管理员入口）
+  router.replace('/admin')
+}
+
+/** 是否已登录管理员：未登录时本页显示管理员登录卡，由路由守卫放行到此 */
+const isAdmin = computed(() => store.current?.role === 'admin')
+
+/** 管理员登录（独立于公共登录页，仅地址栏直达 /admin 可进入） */
+const loginForm = reactive({ username: '', password: '' })
+const loginLoading = ref(false)
+const loginError = ref('')
+
+async function adminLogin() {
+  loginError.value = ''
+  if (!loginForm.username.trim() || !loginForm.password) {
+    loginError.value = '请输入管理员账号与密码'
+    return
+  }
+  loginLoading.value = true
+  try {
+    store.login(loginForm.username, loginForm.password, 'admin')
+    ElMessage.success('管理员登录成功')
+  } catch (e) {
+    loginError.value = (e as Error).message
+  } finally {
+    loginLoading.value = false
+  }
 }
 </script>
 
@@ -82,13 +108,13 @@ function logout() {
     <header class="admin-header">
       <div class="admin-header-inner">
         <div class="admin-brand">
-          <span class="admin-logo">教</span>
+          <img src="/logo.png" alt="大连私人家教中心" class="admin-logo" />
           <div>
             <div class="admin-title">大连私人家教中心 · 管理后台</div>
             <div class="admin-sub">独立管理页面（门户不设入口）</div>
           </div>
         </div>
-        <div class="admin-user">
+        <div v-if="isAdmin" class="admin-user">
           <span class="admin-user-name">{{ adminName }}</span>
           <button class="admin-logout" type="button" title="退出登录" @click="logout">
             <el-icon><SwitchButton /></el-icon>
@@ -98,7 +124,8 @@ function logout() {
       </div>
     </header>
 
-    <main class="admin-body">
+    <!-- 已登录管理员：后台工作区 -->
+    <main v-if="isAdmin" class="admin-body">
       <!-- 统计 -->
       <div class="admin-stats">
         <div class="admin-stat">
@@ -201,6 +228,41 @@ function logout() {
         </el-tabs>
       </div>
     </main>
+
+    <!-- 未登录：管理员专用登录卡（门户无任何入口，仅地址栏手动输入 /admin 直达） -->
+    <main v-else class="admin-login-body">
+      <div class="admin-login-card">
+        <img src="/logo.png" alt="大连私人家教中心" class="admin-login-logo" />
+        <h2 class="admin-login-title">管理后台登录</h2>
+        <p class="admin-login-sub">大连私人家教中心 · 内部管理入口</p>
+
+        <el-form label-position="top" size="large" @submit.prevent="adminLogin">
+          <el-form-item label="管理员账号">
+            <el-input
+              v-model="loginForm.username"
+              placeholder="请输入管理员账号"
+              clearable
+              autocomplete="username"
+              @keyup.enter="adminLogin"
+            />
+          </el-form-item>
+          <el-form-item label="密码">
+            <el-input
+              v-model="loginForm.password"
+              type="password"
+              placeholder="请输入密码"
+              show-password
+              autocomplete="current-password"
+              @keyup.enter="adminLogin"
+            />
+          </el-form-item>
+          <p v-if="loginError" class="admin-login-error">{{ loginError }}</p>
+          <el-button class="admin-login-submit" type="primary" size="large" :loading="loginLoading" @click="adminLogin">
+            登 录
+          </el-button>
+        </el-form>
+      </div>
+    </main>
   </div>
 </template>
 
@@ -241,14 +303,7 @@ function logout() {
 .admin-logo {
   width: 38px;
   height: 38px;
-  border-radius: 11px;
-  background: var(--brand-gradient);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: contain;
 }
 
 .admin-title {
@@ -352,5 +407,58 @@ function logout() {
 
 :deep(.el-tag + .el-tag) {
   margin-left: 4px;
+}
+
+/* ---------- 管理员登录卡（未登录时整页展示） ---------- */
+.admin-login-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px 64px;
+}
+
+.admin-login-card {
+  width: 400px;
+  max-width: 100%;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+  padding: 36px 32px 28px;
+}
+
+.admin-login-logo {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px;
+  display: block;
+  object-fit: contain;
+}
+
+.admin-login-title {
+  text-align: center;
+  font-size: 19px;
+  color: var(--text-main);
+}
+
+.admin-login-sub {
+  margin-top: 6px;
+  margin-bottom: 22px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.admin-login-error {
+  margin: -4px 0 12px;
+  font-size: 12.5px;
+  color: var(--danger-color);
+}
+
+.admin-login-submit {
+  width: 100%;
+  letter-spacing: 6px;
+  margin-top: 2px;
 }
 </style>

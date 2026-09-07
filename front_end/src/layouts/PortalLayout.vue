@@ -41,7 +41,7 @@ function logout() {
     <header class="header">
       <div class="container header-inner">
         <router-link to="/" class="logo" @click="mobileMenuOpen = false">
-          <span class="logo-mark">教</span>
+          <img src="/logo.png" alt="大连私人家教中心" class="logo-mark-img" />
           <span class="logo-text">大连私人家教中心</span>
         </router-link>
 
@@ -183,18 +183,10 @@ function logout() {
   gap: 10px;
 }
 
-.logo-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: var(--brand-gradient);
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(47, 124, 246, 0.35);
+.logo-mark-img {
+  height: 36px;
+  width: auto;
+  display: block;
 }
 
 .logo-text {
