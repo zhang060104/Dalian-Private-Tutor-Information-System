@@ -5,7 +5,7 @@ import { GRADE_OPTIONS, SUBJECT_OPTIONS, TUTORS } from '@/data/tutors'
 import type { Tutor } from '@/types'
 import TutorCard from '@/components/TutorCard.vue'
 
-type SortKey = 'default' | 'rating' | 'price-asc' | 'price-desc' | 'years'
+type SortKey = 'default' | 'rating' | 'taught'
 
 const filters = reactive<{ subject: string; grade: string; mode: string; keyword: string }>({
   subject: '',
@@ -25,7 +25,7 @@ const filtered = computed<Tutor[]>(() => {
     if (filters.grade && !t.grades.includes(filters.grade)) return false
     if (filters.mode && !t.mode.includes(filters.mode as Tutor['mode'][number])) return false
     if (kw) {
-      const haystack = [t.name, t.subjects.join(''), t.education, t.intro, t.tags.join('')].join('').toLowerCase()
+      const haystack = [t.name, t.subjects.join(''), t.intro, t.tags.join('')].join('').toLowerCase()
       if (!haystack.includes(kw)) return false
     }
     return true
@@ -35,14 +35,8 @@ const filtered = computed<Tutor[]>(() => {
     case 'rating':
       list = [...list].sort((a, b) => b.rating - a.rating)
       break
-    case 'price-asc':
-      list = [...list].sort((a, b) => a.pricePerHour - b.pricePerHour)
-      break
-    case 'price-desc':
-      list = [...list].sort((a, b) => b.pricePerHour - a.pricePerHour)
-      break
-    case 'years':
-      list = [...list].sort((a, b) => b.years - a.years)
+    case 'taught':
+      list = [...list].sort((a, b) => b.taughtHours - a.taughtHours)
       break
   }
   return list
@@ -93,9 +87,7 @@ function resetFilters() {
         <el-select v-model="sortKey" class="filter-item" style="width: 150px">
           <el-option label="默认排序" value="default" />
           <el-option label="评分最高" value="rating" />
-          <el-option label="课时费 ↑" value="price-asc" />
-          <el-option label="课时费 ↓" value="price-desc" />
-          <el-option label="教龄最长" value="years" />
+          <el-option label="授课时长最长" value="taught" />
         </el-select>
         <el-button :icon="RefreshLeft" circle title="重置筛选" @click="resetFilters" />
       </div>
@@ -112,7 +104,7 @@ function resetFilters() {
         type="info"
         :closable="false"
         show-icon
-        title="以上为网站初始化示例师资。如需预约试听或咨询真实教员排期，请通过「找家教」提交需求。"
+        title="以上为网站初始化示例师资。入驻平台后可与老师双向选择，正式师资以中心公示为准。"
       />
     </div>
   </div>

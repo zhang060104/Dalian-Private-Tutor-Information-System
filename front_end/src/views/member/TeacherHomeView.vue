@@ -63,7 +63,7 @@ function toggle(s: StudentAccount) {
         <div>
           <h2 class="welcome-title">{{ me.name }}老师，欢迎回来 👋</h2>
           <p class="welcome-sub">
-            账号：{{ me.username }} · 教龄 {{ me.years }} 年 · {{ me.education }} · 课时费 ¥{{ me.pricePerHour }}/小时
+            账号：{{ me.username }}
           </p>
           <p class="welcome-tags">
             <el-tag v-for="s in mySubjects" :key="s" size="small" effect="plain">{{ s }}</el-tag>

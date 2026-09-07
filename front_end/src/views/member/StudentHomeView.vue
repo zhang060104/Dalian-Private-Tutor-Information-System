@@ -98,7 +98,7 @@ function toggle(t: TeacherAccount) {
                 <el-tag v-if="stateOf(t).mutual" size="small" type="success" effect="dark">✓ 已匹配</el-tag>
               </h4>
               <p class="person-meta">
-                {{ t.gender }} · 教龄 {{ t.years }} 年 · {{ t.education }} · ¥{{ t.pricePerHour }}/小时
+                {{ t.gender }}
               </p>
             </div>
           </header>

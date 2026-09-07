@@ -8,14 +8,14 @@ const router = useRouter()
 const VALUES = [
   { title: '口碑为本', desc: '不搞低价引流，不靠话术推销，用效果和口碑说话，大部分新家长来自老家长转介绍。' },
   { title: '效果可视', desc: '入学建档、阶段测评、定期反馈，每次辅导都有记录，进步看得见。' },
-  { title: '长期陪伴', desc: '一个孩子一个专属顾问，从小学到高中，学习规划一路有人管。' },
+  { title: '长期陪伴', desc: '从小学到高中，学习规划一路有人跟进，长期陪伴孩子成长。' },
 ]
 
 const PROCESS = [
-  '提交需求 → 需求分析',
-  '匹配推荐 2-3 位教员',
-  '免费试听 & 双向选择',
-  '正式开课 & 全程跟踪',
+  '扫码入驻 → 完善资料',
+  '双向选择 & 简历投递',
+  '缴纳定金 & 确认订单',
+  '试课通过 → 正式授课',
 ]
 
 const NUMBERS = [
@@ -58,7 +58,7 @@ const NUMBERS = [
           </p>
           <p>
             因此我们从源头抓起——每位教员必须通过学历核验、教学经验背调与现场试讲三重审核，
-            通过率不足 20%；同时坚持「免费试听、按次付费、不满意随时更换」，把主动权完全交给家长。
+            通过率不足 20%；同时坚持「师生双向选择、双方定金保障、试课满意再开课」，把主动权交给家长和老师。
           </p>
           <p>
             我们相信教育是慢功夫，不追求短期刷分，更看重学习习惯与方法的养成。
@@ -70,10 +70,10 @@ const NUMBERS = [
           <div class="card-title">服务承诺</div>
           <ul class="promise-list">
             <li><el-icon color="#16a34a"><Check /></el-icon>师资三审，不合格不上岗</li>
-            <li><el-icon color="#16a34a"><Check /></el-icon>首次试听免费</li>
-            <li><el-icon color="#16a34a"><Check /></el-icon>按次付费，无预收捆绑</li>
-            <li><el-icon color="#16a34a"><Check /></el-icon>不满意免费更换教员</li>
-            <li><el-icon color="#16a34a"><Check /></el-icon>专属顾问全程跟踪</li>
+            <li><el-icon color="#16a34a"><Check /></el-icon>师生双向选择，互选才匹配</li>
+            <li><el-icon color="#16a34a"><Check /></el-icon>双方定金保障，防止逃单</li>
+            <li><el-icon color="#16a34a"><Check /></el-icon>试课满意再开课，未通过退一半</li>
+            <li><el-icon color="#16a34a"><Check /></el-icon>授课结束退全额押金</li>
           </ul>
         </div>
       </div>
@@ -107,8 +107,8 @@ const NUMBERS = [
               <span>{{ p }}</span>
             </div>
           </div>
-          <el-button type="primary" round size="large" @click="router.push('/contact')">
-            立即预约
+          <el-button type="primary" round size="large" @click="router.push('/register')">
+            立即入驻
             <el-icon class="btn-icon"><ArrowRight /></el-icon>
           </el-button>
         </div>

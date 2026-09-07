@@ -15,7 +15,6 @@ const router = createRouter({
         { path: '', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { title: '首页' } },
         { path: 'tutors', name: 'tutors', component: () => import('@/views/TutorsView.vue'), meta: { title: '教员库' } },
         { path: 'about', name: 'about', component: () => import('@/views/AboutView.vue'), meta: { title: '关于中心' } },
-        { path: 'contact', name: 'contact', component: () => import('@/views/ContactView.vue'), meta: { title: '找家教' } },
         // —— 角色账号体系 ——
         { path: 'login', name: 'login', component: () => import('@/views/auth/LoginView.vue'), meta: { title: '登录' } },
         {

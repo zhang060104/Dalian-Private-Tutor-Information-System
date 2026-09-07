@@ -7,9 +7,9 @@ import {
   Check,
   StarFilled,
   Medal,
-  Reading,
   ChatDotRound,
-  EditPen,
+  Lock,
+  CircleCheck,
 } from '@element-plus/icons-vue'
 import { TUTORS } from '@/data/tutors'
 import { CENTER_CONTACT } from '@/types'
@@ -25,48 +25,48 @@ const FEATURES = [
   },
   {
     icon: UserFilled,
-    title: '精准匹配',
-    desc: '根据学生年级、科目短板与性格特点，一对一匹配最合适的教员。',
+    title: '双向选择',
+    desc: '老师查看学生信息并投递简历，学生确认意向，双方互选才正式匹配。',
   },
   {
-    icon: Check,
-    title: '免费试听',
-    desc: '首次试听不收费，满意再付费，给孩子和老师互相了解的机会。',
+    icon: Lock,
+    title: '定金保障',
+    desc: '双方各缴定金防止单方面逃单，订单全程受平台监管，权益有保障。',
   },
   {
-    icon: EditPen,
-    title: '按次付费',
-    desc: '按课时结算，无预收大额费用，随时可停，家长零风险。',
+    icon: CircleCheck,
+    title: '平台担保',
+    desc: '老师缴纳信息费后解锁对方联系方式；授课结束退还全额押金。',
   },
 ]
 
 const STEPS = [
-  { no: '01', title: '提交需求', desc: '在线填写年级、科目与时间，或直接电话沟通' },
-  { no: '02', title: '匹配教员', desc: '顾问 2 小时内响应，推荐 2-3 位合适教员供选择' },
-  { no: '03', title: '免费试听', desc: '安排试听课，家长孩子满意后再正式开课' },
-  { no: '04', title: '效果跟踪', desc: '专属顾问定期回访，跟进成绩与学习状态' },
+  { no: '01', title: '入驻注册', desc: '老师、学生扫码入驻，完善个人资料与一周空余时间' },
+  { no: '02', title: '双向选择', desc: '老师查看学生信息并投递简历，学生确认接受意向' },
+  { no: '03', title: '定金锁定', desc: '双方缴纳定金，确认订单明细；老师缴纳信息费后解锁对方联系方式' },
+  { no: '04', title: '试课开课', desc: '安排免费试课，通过即正式授课；未通过退还一半定金与信息费' },
 ]
 
 const FAQS = [
   {
     q: '你们如何保证教员质量？',
-    a: '每位教员都经过学历核验、教学经验背调与现场试讲三重审核，正式录用率低于 20%。同时我们提供免费试听，家长和孩子可直观感受教学水平。',
+    a: '每位教员都经过学历核验、教学经验背调与现场试讲三重审核，正式录用率低于 20%，从源头保证师资靠谱。',
   },
   {
-    q: '试听课收费吗？',
-    a: '首次试听完全免费，不收取任何费用。试听满意后按次付费开课，无任何预收或捆绑要求。',
+    q: '试课收费吗？',
+    a: '试课免费。试课通过即正式开课；若未通过，退还双方一半定金与老师一半信息费并取消订单，双方损失可控。',
   },
   {
-    q: '可以上门授课吗？覆盖哪些区域？',
-    a: '可以。我们提供上门与在线两种方式，上门服务覆盖大连市内各区，具体以教员可服务范围为准，可在筛选时查看。',
+    q: '为什么要缴纳定金？',
+    a: '师生双方各缴定金，用于防止单方面逃单。授课期间定金保留，双方确认授课到期后全额退回。',
   },
   {
-    q: '上课后不满意可以换老师吗？',
-    a: '可以。如对教学风格或效果不满意，可随时联系您的专属顾问免费更换教员，直到匹配到合适为止。',
+    q: '信息费是什么？',
+    a: '老师简历通过后需缴纳信息费（约为授课第一周工资），缴纳后才会向双方展示对方的联系方式与地址，防止绕过平台私下交易。',
   },
   {
     q: '课时费怎么结算？',
-    a: '按次（课时）结算，每次课后支付，无预收大额费用。费用透明，课前与您确认课时单价与时长。',
+    a: '授课期间可选择私下结算或走平台结算（私下结算需学生发起、老师同意）。双方确认授课到期后退回全额押金。',
   },
 ]
 
@@ -89,19 +89,19 @@ const previewTutors = TUTORS.slice(0, 3)
           </h1>
           <p class="hero-desc">
             大连私人家教中心严选名校师资，覆盖小学至高中全科目。
-            免费试听、按次付费、不满意随时换——把选择权交给家长。
+            师生双向选择、双方定金保障——试课满意再开课。
           </p>
           <div class="hero-actions">
-            <el-button type="primary" size="large" round @click="router.push('/contact')">
-              免费预约试听
+            <el-button type="primary" size="large" round @click="router.push('/tutors')">
+              浏览教员库
               <el-icon class="btn-icon"><ArrowRight /></el-icon>
             </el-button>
-            <el-button size="large" round plain @click="router.push('/tutors')">浏览教员库</el-button>
+            <el-button size="large" round plain @click="router.push('/register')">入驻平台</el-button>
           </div>
           <div class="hero-trust">
             <span><el-icon color="#16a34a"><Check /></el-icon>三审严选师资</span>
-            <span><el-icon color="#16a34a"><Check /></el-icon>免费试听</span>
-            <span><el-icon color="#16a34a"><Check /></el-icon>按次付费</span>
+            <span><el-icon color="#16a34a"><Check /></el-icon>双向选择</span>
+            <span><el-icon color="#16a34a"><Check /></el-icon>定金保障</span>
           </div>
         </div>
 
@@ -122,7 +122,7 @@ const previewTutors = TUTORS.slice(0, 3)
           </div>
           <div class="hero-card-foot">
             <el-icon color="#ffb020"><StarFilled /></el-icon>
-            <span>试听满意率 {{ previewTutors[0].rating.toFixed(1) }}+ · 全程跟踪学习效果</span>
+            <span>双向选择 · 定金保障 · 试课满意再开课</span>
           </div>
         </div>
       </div>
@@ -134,7 +134,7 @@ const previewTutors = TUTORS.slice(0, 3)
         <div class="section-head">
           <div class="section-eyebrow">OUR ADVANTAGES</div>
           <h2 class="section-title">为什么选择我们</h2>
-          <p class="section-desc">从筛选教员到课后跟踪，我们把每个环节都做实，让家长省心、放心。</p>
+          <p class="section-desc">从筛选教员到订单保障，我们把每个环节都做实，让家长和老师都省心、放心。</p>
         </div>
         <div class="feature-grid">
           <div v-for="f in FEATURES" :key="f.title" class="feature-card">
@@ -168,13 +168,13 @@ const previewTutors = TUTORS.slice(0, 3)
       </div>
     </section>
 
-    <!-- ============ 找家教流程 ============ -->
+    <!-- ============ 服务流程 ============ -->
     <section class="section">
       <div class="container">
         <div class="section-head">
           <div class="section-eyebrow">HOW IT WORKS</div>
           <h2 class="section-title">四步找到好家教</h2>
-          <p class="section-desc">流程透明简单，最快当天即可安排试听。</p>
+          <p class="section-desc">从入驻到开课，双向选择、定金保障，全程透明可追溯。</p>
         </div>
         <div class="steps">
           <div v-for="(s, i) in STEPS" :key="s.no" class="step">
@@ -211,12 +211,12 @@ const previewTutors = TUTORS.slice(0, 3)
     <section class="cta">
       <div class="container cta-inner">
         <div>
-          <h2 class="cta-title">孩子成绩提升，从一次免费试听开始</h2>
-          <p class="cta-desc">提交需求，顾问将在 2 小时内为您匹配合适教员</p>
+          <h2 class="cta-title">双向选择，找到真正适合孩子的好老师</h2>
+          <p class="cta-desc">入驻平台，完善资料，与心仪老师双向匹配</p>
         </div>
         <div class="cta-actions">
-          <el-button size="large" round color="#fff" text-color="#2f7cf6" @click="router.push('/contact')">
-            在线提交需求
+          <el-button size="large" round color="#fff" text-color="#2f7cf6" @click="router.push('/register')">
+            立即入驻
             <el-icon class="btn-icon"><ArrowRight /></el-icon>
           </el-button>
           <div class="cta-phone">

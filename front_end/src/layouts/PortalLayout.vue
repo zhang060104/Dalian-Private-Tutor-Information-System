@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { path: '/', label: '首页' },
   { path: '/tutors', label: '教员库' },
   { path: '/about', label: '关于中心' },
-  { path: '/contact', label: '找家教' },
 ] as const
 
 const activePath = computed(() => route.path)
@@ -75,7 +74,7 @@ function logout() {
           </template>
           <router-link v-else to="/login" class="header-login">登录 / 入驻</router-link>
 
-          <router-link to="/contact" class="cta-btn">免费预约试听</router-link>
+          <router-link to="/register" class="cta-btn">入驻平台</router-link>
           <button class="menu-toggle" aria-label="菜单" @click="mobileMenuOpen = !mobileMenuOpen">
             <span></span><span></span><span></span>
           </button>
@@ -130,9 +129,9 @@ function logout() {
           <div class="footer-title">服务承诺</div>
           <ul class="footer-list">
             <li>师资三审：学历 / 经验 / 试讲</li>
-            <li>不满意可随时更换教员</li>
-            <li>按次付费，无隐形收费</li>
-            <li>全程跟踪学习效果</li>
+            <li>师生双向选择，互选才匹配</li>
+            <li>双方定金保障，防止逃单</li>
+            <li>试课满意再开课，结束退押金</li>
           </ul>
         </div>
 
