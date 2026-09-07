@@ -20,3 +20,11 @@
 - 匹配规则：老师选学生与学生选老师均为单向意向，双向互选即「已匹配」；管理员后台可总览全部关系
 - ⚠️ 前端演示模式：数据存本浏览器 localStorage，后端接入后由 API 替换（提交人：Claw 助手 / zhang060104 授权）
 - `npm run type-check` 通过
+
+## 2026-09-07 ｜ 空余时间(7×int 位图) + 科目/年级位掩码
+- 数据结构：老师/学生资料新增 `availability: number[7]`（0=周一…6=周日）；每个 int 解码为二进制后取**低 24 位**有效，第 h 位=1 表示 h:00–h+1:00 空闲（1=有空/0=没空）；老师 `subjects`/`grades` 与学生 `subjects` 改为**选项下标位掩码 int**（bit i = 选项列表第 i 项，科目选择与空余时间同一编解码思路）
+- 工具 `utils/availability.ts`：dayBits/availableHours/encodeDay/dayRanges/scheduleSummary（空余时间）+ decodeOptions/encodeOptions/decodeSubjects/encodeSubjects/decodeGrades/encodeGrades（选项掩码），含越界/去重防护与 0xFFFFFF 掩码约束
+- `components/ScheduleEditor.vue`：7 天 × 24 小时点选格编辑器（浅色=没空/深色=有空，title 悬浮显示时段，快捷「工作日 8-18/周末 9-17」与清空），入驻表单老师/学生均接入
+- 展示解码：老师工作台/学生空间显示空余时间摘要与科目/年级标签；学生看老师卡片与老师看学生卡片均显示可约时间；管理后台老师/学生表格新增「一周空余时间」列并解码科目/年级
+- localStorage 键升级 v2（旧数据自动作废重播种）；预置 7 个演示账号均带空余时间数据
+- `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）

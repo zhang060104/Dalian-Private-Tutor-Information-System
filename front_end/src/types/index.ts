@@ -75,16 +75,27 @@ export interface AccountBase {
   createdAt: string
 }
 
+/**
+ * 一周空余时间：7 个 int（下标 0=周一 … 6=周日）
+ * 每个 int 解码为二进制后取**低 24 位**为有效数据，第 h 位 = 1 表示 h:00–h+1:00 空闲。
+ * （1=有空 / 0=没空；由前端 utils/availability.ts 编解码，参考科目位掩码同一思路）
+ */
+export type WeekAvailability = number[]
+
 /** 老师账号（入驻资料） */
 export interface TeacherAccount extends AccountBase {
   role: 'teacher'
   gender: '男' | '女'
-  subjects: string[]
-  grades: string[]
+  /** 主教科目：SUBJECT_OPTIONS 下标位掩码（bit i = SUBJECT_OPTIONS[i] 选中），由前端编解码 */
+  subjects: number
+  /** 可教年级：GRADE_OPTIONS 下标位掩码（bit i = GRADE_OPTIONS[i] 选中） */
+  grades: number
   years: number
   education: string
   intro: string
   pricePerHour: number
+  /** 一周空余时间（7 个 int，见 WeekAvailability） */
+  availability: WeekAvailability
 }
 
 /** 学生账号（入驻资料） */
@@ -92,9 +103,12 @@ export interface StudentAccount extends AccountBase {
   role: 'student'
   gender: '男' | '女'
   grade: string
-  subject: string
+  /** 需要辅导的科目：SUBJECT_OPTIONS 下标位掩码（单科即单 bit 置位） */
+  subjects: number
   guardian: string
   note?: string
+  /** 一周空余时间（7 个 int，见 WeekAvailability） */
+  availability: WeekAvailability
 }
 
 /** 管理员账号 */

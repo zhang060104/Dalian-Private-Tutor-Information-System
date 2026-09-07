@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSystemStore } from '@/stores/system'
+import { decodeGrades, decodeSubjects, scheduleSummary } from '@/utils/availability'
 import type { StudentAccount } from '@/types'
 
 /** 老师工作台：查看入驻资料 + 选择学生（学生也可反向选择老师，双向即匹配） */
@@ -11,6 +12,14 @@ const store = useSystemStore()
 const me = computed(() => (store.current?.role === 'teacher' ? store.current : null))
 const rels = computed(() => (me.value ? store.relationsOfTeacher(me.value.username) : []))
 
+const mySubjects = computed(() => (me.value ? decodeSubjects(me.value.subjects) : []))
+const myGrades = computed(() => (me.value ? decodeGrades(me.value.grades) : []))
+const myScheduleText = computed(() => {
+  if (!me.value) return ''
+  const busy = scheduleSummary(me.value.availability).filter((s) => !s.includes('无空闲'))
+  return busy.length ? busy.join('；') : '未填写空余时间'
+})
+
 const chosenByMe = computed(() => new Set(rels.value.filter((r) => r.by === 'teacher').map((r) => r.studentUsername)))
 const chosenMe = computed(() => new Set(rels.value.filter((r) => r.by === 'student').map((r) => r.studentUsername)))
 const matchedCount = computed(() => [...chosenByMe.value].filter((u) => chosenMe.value.has(u)).length)
@@ -19,6 +28,13 @@ function stateOf(s: StudentAccount) {
   const byMe = chosenByMe.value.has(s.username)
   const byStudent = chosenMe.value.has(s.username)
   return { byMe, byStudent, mutual: byMe && byStudent }
+}
+
+/** 学生空余时间摘要（最多展示 3 天，其余折叠） */
+function scheduleText(availability?: number[]): string {
+  const busy = scheduleSummary(availability).filter((x) => !x.includes('无空闲'))
+  if (!busy.length) return '未填写'
+  return busy.length > 3 ? `${busy.slice(0, 3).join('；')} 等` : busy.join('；')
 }
 
 function toggle(s: StudentAccount) {
@@ -50,9 +66,10 @@ function toggle(s: StudentAccount) {
             账号：{{ me.username }} · 教龄 {{ me.years }} 年 · {{ me.education }} · 课时费 ¥{{ me.pricePerHour }}/小时
           </p>
           <p class="welcome-tags">
-            <el-tag v-for="s in me.subjects" :key="s" size="small" effect="plain">{{ s }}</el-tag>
-            <el-tag v-for="g in me.grades" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
+            <el-tag v-for="s in mySubjects" :key="s" size="small" effect="plain">{{ s }}</el-tag>
+            <el-tag v-for="g in myGrades" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
           </p>
+          <p class="welcome-sched">空余时间：{{ myScheduleText }}</p>
         </div>
       </div>
       <div class="welcome-stats">
@@ -81,7 +98,8 @@ function toggle(s: StudentAccount) {
             <div class="person-avatar">{{ s.name.slice(0, 1) }}</div>
             <div>
               <h4 class="person-name">{{ s.name }}<span class="person-role">学生</span></h4>
-              <p class="person-meta">{{ s.grade }} · {{ s.subject }} · {{ s.guardian }}</p>
+              <p class="person-meta">{{ s.grade }} · {{ decodeSubjects(s.subjects).join('、') || '未选科目' }} · {{ s.guardian }}</p>
+              <p class="person-sched">空闲：{{ scheduleText(s.availability) }}</p>
             </div>
           </header>
           <p v-if="s.note" class="person-note">备注：{{ s.note }}</p>
@@ -180,6 +198,13 @@ function toggle(s: StudentAccount) {
 
 .welcome-tags :deep(.el-tag) {
   background: rgba(255, 255, 255, 0.92);
+}
+
+.welcome-sched {
+  margin-top: 8px;
+  font-size: 12.5px;
+  opacity: 0.92;
+  max-width: 640px;
 }
 
 .welcome-stats {
@@ -298,6 +323,16 @@ function toggle(s: StudentAccount) {
   margin-top: 3px;
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+
+.person-sched {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--brand-color-dark);
+  background: var(--brand-color-light);
+  border-radius: 8px;
+  padding: 6px 10px;
+  line-height: 1.6;
 }
 
 .person-note {

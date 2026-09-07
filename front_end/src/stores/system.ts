@@ -6,6 +6,7 @@ import type {
   StudentAccount,
   TeacherAccount,
 } from '@/types'
+import { encodeDay, encodeGrades, encodeSubjects } from '@/utils/availability'
 
 /**
  * 角色账号体系 Store（前端演示模式）
@@ -14,7 +15,7 @@ import type {
  * 后续接入后端后，本模块替换为 API 调用，组件层无需大改。
  */
 
-const LS_DATA = 'tutor_system_v1'
+const LS_DATA = 'tutor_system_v2' // v2：空余时间(7×int) + 科目/年级位掩码
 const LS_CURRENT = 'tutor_system_current'
 
 export const ROLE_HOME: Record<Role, string> = {
@@ -29,36 +30,58 @@ function now(): string {
   return new Date().toISOString()
 }
 
+/** 空余时间快捷模板：工作日 8-19 点 / 周末 9-17 点 */
+function weekdaysTemplate(weekend?: boolean): number[] {
+  const work = encodeDay([8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
+  const rest = encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17])
+  return weekend ? [work, work, work, work, work, rest, rest] : [work, work, work, work, work, work, work]
+}
+
 function seedData(): { users: AnyAccount[]; relations: MatchRelation[] } {
   const t = now()
   const users: AnyAccount[] = [
     { username: 'admin', password: '123456', role: 'admin', name: '系统管理员', phone: '0411-8888-6666', createdAt: t },
     {
       username: 'teacher1', password: '123456', role: 'teacher', name: '张明', gender: '男',
-      phone: '13800000001', createdAt: t, subjects: ['数学', '奥数'], grades: ['初一', '初二', '初三'],
+      phone: '13800000001', createdAt: t,
+      subjects: encodeSubjects(['数学', '奥数']),
+      grades: encodeGrades(['初一', '初二', '初三']),
       years: 6, education: '辽宁师范大学 本科', intro: '专注中考数学提分，耐心细致，带过 200+ 学生。', pricePerHour: 180,
+      availability: weekdaysTemplate(),
     },
     {
       username: 'teacher2', password: '123456', role: 'teacher', name: '李婷', gender: '女',
-      phone: '13800000002', createdAt: t, subjects: ['英语'], grades: ['小学', '初一', '初二'],
+      phone: '13800000002', createdAt: t,
+      subjects: encodeSubjects(['英语']),
+      grades: encodeGrades(['小学', '初一', '初二']),
       years: 4, education: '大连外国语大学 硕士', intro: '少儿英语启蒙与应试结合，课堂活泼。', pricePerHour: 160,
+      availability: [encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15])],
     },
     {
       username: 'teacher3', password: '123456', role: 'teacher', name: '王强', gender: '男',
-      phone: '13800000003', createdAt: t, subjects: ['物理', '数学'], grades: ['高一', '高二', '高三'],
+      phone: '13800000003', createdAt: t,
+      subjects: encodeSubjects(['物理', '数学']),
+      grades: encodeGrades(['高一', '高二', '高三']),
       years: 8, education: '大连理工大学 本科', intro: '高中物理竞赛辅导经验，擅长体系化教学。', pricePerHour: 220,
+      availability: weekdaysTemplate(),
     },
     {
       username: 'student1', password: '123456', role: 'student', name: '王小雨', gender: '女',
-      phone: '13900000001', createdAt: t, grade: '初二', subject: '数学', guardian: '王先生（家长）', note: '希望周末上午上课',
+      phone: '13900000001', createdAt: t, grade: '初二', subjects: encodeSubjects(['数学']),
+      guardian: '王先生（家长）', note: '希望周末上午上课',
+      availability: [encodeDay([]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17]), encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17])],
     },
     {
       username: 'student2', password: '123456', role: 'student', name: '刘畅', gender: '男',
-      phone: '13900000002', createdAt: t, grade: '高一', subject: '物理', guardian: '刘女士（家长）',
+      phone: '13900000002', createdAt: t, grade: '高一', subjects: encodeSubjects(['物理']),
+      guardian: '刘女士（家长）',
+      availability: [encodeDay([19, 20, 21]), encodeDay([19, 20, 21]), encodeDay([]), encodeDay([19, 20, 21]), encodeDay([19, 20, 21]), encodeDay([9, 10, 11, 12, 13, 14, 15]), encodeDay([])],
     },
     {
       username: 'student3', password: '123456', role: 'student', name: '陈曦', gender: '女',
-      phone: '13900000003', createdAt: t, grade: '小学六年级', subject: '英语', guardian: '陈先生（家长）', note: '基础薄弱，需耐心',
+      phone: '13900000003', createdAt: t, grade: '小学六年级', subjects: encodeSubjects(['英语']),
+      guardian: '陈先生（家长）', note: '基础薄弱，需耐心',
+      availability: weekdaysTemplate(false),
     },
   ]
   return { users, relations: [] }
