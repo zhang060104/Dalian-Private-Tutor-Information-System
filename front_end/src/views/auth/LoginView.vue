@@ -68,7 +68,7 @@ function switchRole(role: PortalRole) {
 
         <div class="auth-brand-inner">
           <div class="auth-brand-head">
-            <span class="auth-brand-logo">教</span>
+            <img src="/logo.png" alt="大连私人家教中心" class="auth-brand-logo" />
             <span class="auth-brand-name">大连私人家教中心</span>
           </div>
 
@@ -256,16 +256,12 @@ function switchRole(role: PortalRole) {
 }
 
 .auth-brand-logo {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--brand-color);
-  font-size: 20px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 4px;
+  object-fit: contain;
   box-shadow: 0 6px 16px rgba(15, 60, 150, 0.2);
 }
 

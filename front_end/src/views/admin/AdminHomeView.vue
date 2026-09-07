@@ -108,7 +108,7 @@ async function adminLogin() {
     <header class="admin-header">
       <div class="admin-header-inner">
         <div class="admin-brand">
-          <span class="admin-logo">教</span>
+          <img src="/logo.png" alt="大连私人家教中心" class="admin-logo" />
           <div>
             <div class="admin-title">大连私人家教中心 · 管理后台</div>
             <div class="admin-sub">独立管理页面（门户不设入口）</div>
@@ -237,7 +237,7 @@ async function adminLogin() {
     <!-- 未登录：管理员专用登录卡（门户无任何入口，仅地址栏手动输入 /admin 直达） -->
     <main v-else class="admin-login-body">
       <div class="admin-login-card">
-        <div class="admin-login-logo">教</div>
+        <img src="/logo.png" alt="大连私人家教中心" class="admin-login-logo" />
         <h2 class="admin-login-title">管理后台登录</h2>
         <p class="admin-login-sub">大连私人家教中心 · 内部管理入口</p>
 
@@ -308,14 +308,7 @@ async function adminLogin() {
 .admin-logo {
   width: 38px;
   height: 38px;
-  border-radius: 11px;
-  background: var(--brand-gradient);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: contain;
 }
 
 .admin-title {
@@ -441,18 +434,11 @@ async function adminLogin() {
 }
 
 .admin-login-logo {
-  width: 52px;
-  height: 52px;
+  width: 64px;
+  height: 64px;
   margin: 0 auto 12px;
-  border-radius: 16px;
-  background: var(--brand-gradient);
-  color: #fff;
-  font-size: 26px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-md);
+  display: block;
+  object-fit: contain;
 }
 
 .admin-login-title {
