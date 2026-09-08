@@ -125,3 +125,22 @@
 - 路由守卫支持 `roles: ['teacher','student']` 数组（登录后按角色，未登录去 /login 带回 redirect）。
 - 验证：`npm run type-check` 通过；dev server（5180）各新页面模块均 200。
 - 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 删除「关于中心」页（/about，纯前端）
+- 删除 `front_end/src/views/AboutView.vue` 与路由 `/about`。
+- `PortalLayout` 顶部导航精简：未登录仅「首页」，登录师生另加「双选大厅」（原 about 入口删除）。
+- `HomeView` CTA「了解平台」按钮（跳 /about）删除。
+- 全仓无 AboutView/「关于中心」残留；`npm run type-check` 通过。
+- 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 前端整体废弃重建 + 删除项目内数据库脚本（承接上一条：about 随重建一并废弃）
+**背景**：旧 front_end 多轮迭代后问题过多（工程骨架文件曾丢失、代码与新架构冲突），决定废弃重建。
+- 删除旧 `front_end` 全部文件：业务源码（门户 / 双选大厅 / member / auth / admin / store / api 等 ~4486 行）、
+  public 静态资源、Element Plus 依赖与样式体系；about 页随旧代码一并移除（覆盖上一条「删 about」）。
+- 重建标准空骨架：Vue 3.5 + Vite 8 + TypeScript 6 + Vue Router + Pinia，仅含 `/` 占位页，无任何业务逻辑。
+  注：`create-vue` 交互式脚手架因环境批量删除保护拦截未能完整落地，改为逐文件落盘（产物等同官方空模板）。
+  验证：`npm run type-check` 通过、`vite build` 成功、`npm run dev` HTTP 200。
+- 删除 `back_end/sql/` 的 `schema.sql` / `seed.sql`：数据库构建脚本不再直接存于项目目录（避免后续维护推送成本），
+  schema 重构待「数据库设计说明文档.md」更新后落地。
+- 后续：数据库文档 → 数据库重构 + 后端逻辑重构 → 前端按新契约重开发。
+- 提交人：Claw 助手 / zhang060104 授权
