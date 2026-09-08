@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import type {
   AnyAccount,
   MatchRelation,
+  ProfileReview,
+  ProfileReviewField,
   Role,
   StudentAccount,
   TeacherAccount,
@@ -15,7 +17,7 @@ import { encodeDay, encodeGrades, encodeSubjects } from '@/utils/availability'
  * 后续接入后端后，本模块替换为 API 调用，组件层无需大改。
  */
 
-const LS_DATA = 'tutor_system_v2' // v2：空余时间(7×int) + 科目/年级位掩码
+const LS_DATA = 'tutor_system_v2' // v2：空余时间(7×int) + 科目/年级位掩码；含 reviews（资料修改审核队列）
 const LS_CURRENT = 'tutor_system_current'
 
 export const ROLE_HOME: Record<Role, string> = {
@@ -37,7 +39,7 @@ function weekdaysTemplate(weekend?: boolean): number[] {
   return weekend ? [work, work, work, work, work, rest, rest] : [work, work, work, work, work, work, work]
 }
 
-function seedData(): { users: AnyAccount[]; relations: MatchRelation[] } {
+function seedData(): { users: AnyAccount[]; relations: MatchRelation[]; reviews: ProfileReview[] } {
   const t = now()
   const users: AnyAccount[] = [
     { username: 'admin', password: '123456', role: 'admin', name: '系统管理员', phone: '0411-8888-6666', createdAt: t },
@@ -84,15 +86,18 @@ function seedData(): { users: AnyAccount[]; relations: MatchRelation[] } {
       availability: weekdaysTemplate(false),
     },
   ]
-  return { users, relations: [] }
+  return { users, relations: [], reviews: [] }
 }
 
-function loadData(): { users: AnyAccount[]; relations: MatchRelation[] } {
+function loadData(): { users: AnyAccount[]; relations: MatchRelation[]; reviews: ProfileReview[] } {
   try {
     const raw = localStorage.getItem(LS_DATA)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.users) && Array.isArray(parsed.relations)) return parsed
+      if (Array.isArray(parsed.users) && Array.isArray(parsed.relations)) {
+        // 兼容旧版本数据：v2 之前无 reviews 字段
+        return { users: parsed.users, relations: parsed.relations, reviews: parsed.reviews ?? [] }
+      }
     }
   } catch {
     /* ignore */
@@ -120,11 +125,21 @@ function saveCurrent(u: AnyAccount | null) {
 /* ---------------- Store ---------------- */
 
 export const useSystemStore = defineStore('system', {
-  state: () => ({
-    users: loadData().users as AnyAccount[],
-    relations: loadData().relations as MatchRelation[],
-    current: loadCurrentUser() as AnyAccount | null,
-  }),
+  state: () => {
+    const data = loadData()
+    // current 若与 users 中的实时资料不一致（如资料刚被管理员审核通过），以 users 为准
+    const cached = loadCurrentUser()
+    const live =
+      cached && cached.role !== 'admin'
+        ? (data.users.find((u) => u.username === cached.username && u.role === cached.role) as AnyAccount | undefined)
+        : undefined
+    return {
+      users: data.users as AnyAccount[],
+      relations: data.relations as MatchRelation[],
+      reviews: data.reviews as ProfileReview[],
+      current: (live ?? cached) as AnyAccount | null,
+    }
+  },
 
   getters: {
     teachers: (s) => s.users.filter((u) => u.role === 'teacher') as TeacherAccount[],
@@ -139,7 +154,7 @@ export const useSystemStore = defineStore('system', {
 
   actions: {
     persist() {
-      localStorage.setItem(LS_DATA, JSON.stringify({ users: this.users, relations: this.relations }))
+      localStorage.setItem(LS_DATA, JSON.stringify({ users: this.users, relations: this.relations, reviews: this.reviews }))
     },
 
     /** 老师入驻（含账号 + 个人信息） */
@@ -220,6 +235,73 @@ export const useSystemStore = defineStore('system', {
     },
     relationsOfStudent(username: string) {
       return this.relations.filter((r) => r.studentUsername === username)
+    },
+
+    /* ---------------- 个人资料修改审核（学生/老师提交 → 管理员审核） ---------------- */
+
+    /** 该用户当前是否有待审核的资料修改申请 */
+    pendingReviewOf(username: string): ProfileReview | undefined {
+      return this.reviews.find((r) => r.username === username)
+    },
+
+    /**
+     * 提交个人资料修改申请。
+     * 审核通过前 users 中保持旧资料（对外展示不变）；同一用户同时仅允许一条待审申请。
+     */
+    submitProfileReview(
+      username: string,
+      role: 'teacher' | 'student',
+      name: string,
+      next: Partial<TeacherAccount> | Partial<StudentAccount>,
+      fields: ProfileReviewField[],
+    ) {
+      if (this.pendingReviewOf(username)) {
+        throw new Error('你已有一份资料修改申请待管理员审核，请耐心等待结果')
+      }
+      const review: ProfileReview = {
+        id: `pr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        username,
+        role,
+        name,
+        submittedAt: now(),
+        next,
+        fields,
+      }
+      this.reviews.push(review)
+      this.persist()
+      return review
+    },
+
+    /** 本人撤销自己的待审申请（仅登录本人可操作） */
+    cancelProfileReview(id: string) {
+      const me = this.current
+      const review = this.reviews.find((r) => r.id === id)
+      if (!review) throw new Error('申请不存在或已被处理')
+      if (!me || me.username !== review.username) throw new Error('仅申请人本人可撤销')
+      this.reviews = this.reviews.filter((r) => r.id !== id)
+      this.persist()
+    },
+
+    /** 管理员审核通过：把申请的新资料合并进用户，移除申请 */
+    approveProfileReview(id: string) {
+      const idx = this.reviews.findIndex((r) => r.id === id)
+      if (idx < 0) throw new Error('申请不存在或已被处理')
+      const review = this.reviews[idx]
+      const user = this.users.find((u) => u.username === review.username && u.role === review.role)
+      if (!user) throw new Error('对应用户不存在')
+      Object.assign(user, review.next)
+      // 若被修改的正是当前登录会话（极少见），同步刷新登录态
+      if (this.current?.username === review.username) saveCurrent(user)
+      this.reviews.splice(idx, 1)
+      this.persist()
+    },
+
+    /** 管理员审核驳回：丢弃申请（保留原资料） */
+    rejectProfileReview(id: string) {
+      const idx = this.reviews.findIndex((r) => r.id === id)
+      if (idx < 0) throw new Error('申请不存在或已被处理')
+      this.reviews.splice(idx, 1)
+      this.persist()
     },
   },
 })

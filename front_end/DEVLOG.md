@@ -44,3 +44,10 @@
 - ⚠️ 未改动 `Tutor`（教员库公开 mock 展示类型）：`data/tutors.ts` / `TutorCard` / `TutorsView` 的教龄、学历、课时费展示与排序保持原样
 - ⚠️ localStorage 已有旧账号数据的浏览器需清缓存/重新播种（键 `tutor_system_v2`），否则旧数据仍带这三字段
 - `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
+
+## 2026-09-08 · 师生个人资料展示与修改（管理员审核制）
+- 学生/老师面板新增「我的资料」完整展示区（el-descriptions）+「修改资料」弹窗（姓名/性别/联系电话/年级/辅导科目/家长或简介/空余时间，空余时间复用 ScheduleEditor 位图编辑）
+- 修改提交后进入待审核队列：localStorage 数据新增 reviews 字段（兼容旧数据自动补空）；审核通过前对外仍展示旧资料；同一用户仅允许一条待审申请，本人可随时撤销
+- 管理后台新增「资料审核」Tab（含待审统计卡）：字段级新旧对比（旧值红色删除线 → 新值绿色），支持通过（合并生效）/驳回（保留原资料）
+- types 新增 ProfileReview/ProfileReviewField；store 新增 submitProfileReview / approveProfileReview / rejectProfileReview / cancelProfileReview / pendingReviewOf；登录态与 users 实时资料自动同步
+- npm run type-check / build 通过（Claw 提交 / zhang060104 授权）
