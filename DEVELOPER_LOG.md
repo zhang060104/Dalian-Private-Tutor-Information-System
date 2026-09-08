@@ -78,3 +78,17 @@
   - 门户「教员库」的 `Tutor` mock（评分/标签/授课方式等营销展示字段）保留，不接数据库
 - 分支：`feature/backend-service`，待联调验证后提 PR（不直推 main）
 - 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 个人资料修改审核（管理员审核制）+ 两次 main 冲突合并
+- **冲突处理（PR #9 vs main）**：
+  - 与 PR #8（移除学生端老师列表）冲突：按业务口径**保留删除**，学生页面不放老师选择列表，选择动作由老师侧发起
+  - 与 PR #10（师生资料展示与修改 + 管理员审核制）冲突：5 文件 / 9 处，根因是**架构对撞**（PR #10 基于本地缓存 + username，PR #9 已把 store 换成后端 API + phone）。
+    处理为**冲突全取后端分支**，PR #10 前端实现整段弃用，功能改在 API 版上重做（DEVLOG 按只增不删保留其原始记录）
+- **后端新增资料修改审核**：`ProfileReviewService` + `ProfileController` + `ProfileReviewSubmit`/`ProfileReviewVO`/`ProfileFieldDiff`
+  - 接口：`GET /api/profile/review/mine`、`POST /api/profile/review`、`POST /api/profile/review/{id}/cancel`、
+    `GET /api/admin/reviews`、`POST /api/admin/requests/{id}/resolve?approve=true|false`
+  - 复用 `requestLog`（type 0=教师信息修改 / 1=学生信息修改，`json` 存 `{name, fields, profile, submittedAt}`，`tarID` 指向师生 id）
+  - ⚠️ 审核通过落库用 Jackson `readerForUpdating` 合并进已有实体再 `updateProfile`，避免未提交字段被置空
+- **前端**：学生/老师面板「我的资料」+ 修改弹窗 + 待审撤销；管理后台「资料审核」Tab + 字段级新旧对比（通过/驳回）
+- 验证：`mvn compile` BUILD SUCCESS（34 源文件）；`npm run type-check` 通过
+- 提交人：Claw 助手 / zhang060104 授权

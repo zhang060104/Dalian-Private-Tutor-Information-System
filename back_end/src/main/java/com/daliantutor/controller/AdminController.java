@@ -3,6 +3,7 @@ package com.daliantutor.controller;
 import com.daliantutor.common.ApiResponse;
 import com.daliantutor.common.BizException;
 import com.daliantutor.dto.OrderVO;
+import com.daliantutor.dto.ProfileReviewVO;
 import com.daliantutor.entity.Order;
 import com.daliantutor.entity.RequestLog;
 import com.daliantutor.entity.Student;
@@ -11,6 +12,7 @@ import com.daliantutor.mapper.OrderMapper;
 import com.daliantutor.mapper.RequestLogMapper;
 import com.daliantutor.mapper.StudentMapper;
 import com.daliantutor.mapper.TeacherMapper;
+import com.daliantutor.service.ProfileReviewService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -26,13 +28,16 @@ public class AdminController {
     private final StudentMapper studentMapper;
     private final OrderMapper orderMapper;
     private final RequestLogMapper requestLogMapper;
+    private final ProfileReviewService reviewService;
 
     public AdminController(TeacherMapper teacherMapper, StudentMapper studentMapper,
-                           OrderMapper orderMapper, RequestLogMapper requestLogMapper) {
+                           OrderMapper orderMapper, RequestLogMapper requestLogMapper,
+                           ProfileReviewService reviewService) {
         this.teacherMapper = teacherMapper;
         this.studentMapper = studentMapper;
         this.orderMapper = orderMapper;
         this.requestLogMapper = requestLogMapper;
+        this.reviewService = reviewService;
     }
 
     /** 统计：老师/学生/订单/匹配数 */
@@ -106,11 +111,27 @@ public class AdminController {
         return ApiResponse.ok(requestLogMapper.selectAll());
     }
 
-    /** 处理待审核请求（通过/驳回均为移除该请求） */
+    /** 待审核的资料修改申请（type 0=教师信息修改，1=学生信息修改） */
+    @GetMapping("/reviews")
+    public ApiResponse<List<ProfileReviewVO>> reviews() {
+        return ApiResponse.ok(reviewService.listPending());
+    }
+
+    /**
+     * 处理待审核请求
+     *
+     * @param approve true=通过：资料修改类请求会把新资料写入 teacher / student 表；false=驳回，仅移除请求
+     */
     @PostMapping("/requests/{id}/resolve")
-    public ApiResponse<Void> resolve(@PathVariable Integer id) {
-        if (requestLogMapper.findById(id) == null) {
+    public ApiResponse<Void> resolve(@PathVariable Integer id,
+                                     @RequestParam(defaultValue = "false") boolean approve) {
+        RequestLog log = requestLogMapper.findById(id);
+        if (log == null) {
             throw new BizException("请求不存在");
+        }
+        if (approve && (log.getType() == ProfileReviewService.TYPE_TEACHER
+                || log.getType() == ProfileReviewService.TYPE_STUDENT)) {
+            reviewService.apply(log);
         }
         requestLogMapper.deleteById(id);
         return ApiResponse.ok();

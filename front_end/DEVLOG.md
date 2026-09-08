@@ -87,3 +87,19 @@
 - 管理后台新增「资料审核」Tab（含待审统计卡）：字段级新旧对比（旧值红色删除线 → 新值绿色），支持通过（合并生效）/驳回（保留原资料）
 - types 新增 ProfileReview/ProfileReviewField；store 新增 submitProfileReview / approveProfileReview / rejectProfileReview / cancelProfileReview / pendingReviewOf；登录态与 users 实时资料自动同步
 - npm run type-check / build 通过（Claw 提交 / zhang060104 授权）
+
+## 2026-09-08 ｜ 资料修改审核在 API 版上重做（替代 PR #10 的本地缓存实现）
+后端：
+- 新增 `service/ProfileReviewService` + `controller/ProfileController` + 三个 DTO（`ProfileReviewSubmit` / `ProfileReviewVO` / `ProfileFieldDiff`）
+- 接口：`GET /api/profile/review/mine`（我的待审）、`POST /api/profile/review`（提交）、`POST /api/profile/review/{id}/cancel`（撤销）、`GET /api/admin/reviews`（待审列表）、`POST /api/admin/requests/{id}/resolve?approve=true|false`
+- 存储复用 `requestLog`：type 0=教师信息修改 / 1=学生信息修改，`json` 存 `{name, fields, profile, submittedAt}`，`tarID` 指向师生 id
+- ⚠️ 关键实现：审核通过时用 Jackson `readerForUpdating` 把 profile **合并进库里已有实体**再调 `updateProfile`，只覆盖提交的字段；否则未传字段（如 `age`）会被 SQL 置空
+- `RequestLogMapper` 新增 `findByTypeAndTarId`：同一用户只允许一条待审申请，提交前查重
+
+前端：
+- `types`：`ProfileReview` 的 `username` → `phone`（数据库无 username），`id` 改 number，去掉 `next`（新资料由后端 profile 承载）
+- `stores/system.ts`：新增 `myReview` / `reviews` 两个状态与 `loadMyReview` / `submitProfileReview` / `cancelMyReview` / `loadReviews` / `resolveReview`
+- 学生 / 老师面板：新增「我的资料」展示区（`el-descriptions`）+ 修改弹窗（年级用 `GRADE_LEVELS` 数值、科目走位掩码、空余时间复用 `ScheduleEditor`）+ 待审提示与撤销
+- 管理后台：新增「资料审核」Tab（含待审统计卡）+ 字段级新旧对比弹窗（旧值删除线 → 新值绿色），支持通过（新资料立即生效）/ 驳回
+- 与 PR #10 的差异：数据源由本地缓存改为后端 API；学生去掉 `guardian`（数据库无该字段）；联系电话不可改（`updateProfile` 不含 phone）
+- `mvn compile` BUILD SUCCESS；`npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）

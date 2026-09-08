@@ -119,14 +119,13 @@ export interface ProfileReviewField {
  * 通过后由管理员将 next 合并进对应用户；驳回/撤销则直接移除本条申请。
  */
 export interface ProfileReview {
-  id: string
-  username: string
+  id: number
+  /** 申请人登录标识（手机号），数据库无 username 字段 */
+  phone: string
   role: 'teacher' | 'student'
   /** 提交人姓名（提交时快照，便于后台展示） */
   name: string
   submittedAt: string
-  /** 申请的新资料（含位掩码编码后的字段；approve 时合并到用户） */
-  next: Partial<TeacherAccount> | Partial<StudentAccount>
   /** 字段级变更清单（只含有变化的字段） */
   fields: ProfileReviewField[]
 }

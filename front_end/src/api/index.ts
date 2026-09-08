@@ -54,6 +54,16 @@ export interface LoginResult {
   phone: string
 }
 
+/** 个人资料修改申请（后端 requestLog 解析后的展示结构） */
+export interface ProfileReviewDto {
+  id: number
+  role: 'teacher' | 'student'
+  phone: string
+  name: string
+  submittedAt: string
+  fields: { label: string; old: string; next: string }[]
+}
+
 export function login(phone: string, password: string, role: string): Promise<LoginResult> {
   return http.post('/auth/login', { phone, password, role })
 }
@@ -100,4 +110,33 @@ export function adminStudents(): Promise<StudentDto[]> {
 
 export function adminOrders(): Promise<OrderDto[]> {
   return http.get('/admin/orders')
+}
+
+/** 我的待审资料修改申请（没有则 null） */
+export function getMyProfileReview(): Promise<ProfileReviewDto | null> {
+  return http.get('/profile/review/mine')
+}
+
+/** 提交资料修改申请（profile 用后端实体字段名） */
+export function submitProfileReview(payload: {
+  name: string
+  fields: { label: string; old: string; next: string }[]
+  profile: Record<string, unknown>
+}): Promise<ProfileReviewDto> {
+  return http.post('/profile/review', payload)
+}
+
+/** 撤销我的申请 */
+export function cancelProfileReview(id: number): Promise<void> {
+  return http.post(`/profile/review/${id}/cancel`)
+}
+
+/** 管理端：待审资料修改申请列表 */
+export function adminReviews(): Promise<ProfileReviewDto[]> {
+  return http.get('/admin/reviews')
+}
+
+/** 管理端：处理审核请求，approve=true 时新资料生效 */
+export function resolveRequest(id: number, approve: boolean): Promise<void> {
+  return http.post(`/admin/requests/${id}/resolve`, null, { params: { approve } })
 }

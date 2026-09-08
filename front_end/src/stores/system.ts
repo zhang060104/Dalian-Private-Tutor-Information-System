@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import type {
   AnyAccount,
   MatchRelation,
+  ProfileReview,
+  ProfileReviewField,
   Role,
   StudentAccount,
   TeacherAccount,
@@ -100,6 +102,10 @@ export const useSystemStore = defineStore('system', {
     students: [] as StudentAccount[],
     relations: [] as MatchRelation[],
     current: loadCurrentUser() as AnyAccount | null,
+    /** 我的待审资料修改申请（学生/老师） */
+    myReview: null as ProfileReview | null,
+    /** 管理端：全部待审资料修改申请 */
+    reviews: [] as ProfileReview[],
   }),
 
   getters: {
@@ -135,6 +141,8 @@ export const useSystemStore = defineStore('system', {
       this.teachers = []
       this.students = []
       this.relations = []
+      this.myReview = null
+      this.reviews = []
       localStorage.removeItem(TOKEN_KEY)
       saveCurrent(null)
     },
@@ -238,6 +246,43 @@ export const useSystemStore = defineStore('system', {
     },
     relationsOfStudent(phone: string) {
       return this.relations.filter((r) => r.studentPhone === phone)
+    },
+
+    /* ---------------- 个人资料修改审核（管理员审核制） ---------------- */
+
+    /** 加载我的待审申请（没有则 null） */
+    async loadMyReview() {
+      if (!this.current || this.current.role === 'admin') return
+      this.myReview = await api.getMyProfileReview()
+    },
+
+    /**
+     * 提交资料修改申请
+     * @param profile 新资料，键为后端实体字段（nickname/gender/grade/subject/description/timeTable1~7）
+     * @param fields 字段级新旧对比（只含有变化的字段）
+     */
+    async submitProfileReview(profile: Record<string, unknown>, fields: ProfileReviewField[]) {
+      if (!this.current) throw new Error('请先登录')
+      this.myReview = await api.submitProfileReview({ name: this.current.name, fields, profile })
+    },
+
+    /** 撤销我的申请 */
+    async cancelMyReview() {
+      if (!this.myReview) return
+      await api.cancelProfileReview(this.myReview.id)
+      this.myReview = null
+    },
+
+    /** 管理端：加载待审申请列表 */
+    async loadReviews() {
+      this.reviews = await api.adminReviews()
+    },
+
+    /** 管理端：通过（新资料生效）/ 驳回 */
+    async resolveReview(id: number, approve: boolean) {
+      await api.resolveRequest(id, approve)
+      await this.loadReviews()
+      if (approve) await this.loadAll()
     },
   },
 })
