@@ -39,7 +39,7 @@ async function submit() {
   }
   loading.value = true
   try {
-    store.login(form.phone, form.password, activeRole.value)
+    await store.login(form.phone, form.password, activeRole.value)
     ElMessage.success('登录成功')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     router.replace(redirect.startsWith('/') ? redirect : ROLE_HOME[activeRole.value])

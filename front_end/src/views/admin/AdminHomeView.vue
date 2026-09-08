@@ -1,25 +1,63 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { SwitchButton } from '@element-plus/icons-vue'
 import { useSystemStore } from '@/stores/system'
 import { decodeSubjects, scheduleSummary } from '@/utils/availability'
 import { gradeLabel } from '@/data/tutors'
+import * as api from '@/api'
+import type { TeacherDto, StudentDto, OrderDto } from '@/api'
 
 /**
  * 独立管理后台（/admin）
  *
  * 约定：门户页面不设置任何跳转入口，本页也不放置任何站内导航/跳转按钮，
  * 仅保留右上角「退出登录」这一功能性操作。管理员直接访问 /admin 进入。
+ * 数据来源：/api/admin/* 后端接口。
  */
 
 const store = useSystemStore()
 const router = useRouter()
 
-const teachers = computed(() => store.teachers)
-const students = computed(() => store.students)
+const teachers = ref<Array<Record<string, unknown>>>([])
+const students = ref<Array<Record<string, unknown>>>([])
+const adminOrders = ref<OrderDto[]>([])
 const adminName = computed(() => (store.current?.role === 'admin' ? store.current.name : '管理员'))
+
+function teacherView(dto: TeacherDto) {
+  return {
+    name: dto.nickname,
+    gender: dto.gender,
+    phone: dto.phone,
+    subjects: dto.subject ?? 0,
+    grade: dto.grade ?? 0,
+    availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
+  }
+}
+
+function studentView(dto: StudentDto) {
+  return {
+    name: dto.nickname,
+    gender: dto.gender,
+    phone: dto.phone,
+    subjects: dto.subject ?? 0,
+    grade: dto.grade ?? 0,
+    note: dto.description || undefined,
+    availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
+  }
+}
+
+async function loadAdminData() {
+  const [t, s, o] = await Promise.all([api.adminTeachers(), api.adminStudents(), api.adminOrders()])
+  teachers.value = t.map(teacherView)
+  students.value = s.map(studentView)
+  adminOrders.value = o
+}
+
+onMounted(() => {
+  loadAdminData().catch(() => {})
+})
 
 interface PairView {
   teacherName: string
@@ -33,21 +71,18 @@ interface PairView {
 /** 汇总师生匹配关系（按 老师×学生 归并双向选择） */
 const pairs = computed<PairView[]>(() => {
   const map = new Map<string, PairView>()
-  for (const r of store.relations) {
-    const teacher = store.users.find((u) => u.phone === r.teacherPhone)
-    const student = store.users.find((u) => u.phone === r.studentPhone)
-    if (!teacher || !student) continue
-    const key = `${r.teacherPhone}|${r.studentPhone}`
+  for (const o of adminOrders.value) {
+    const key = `${o.teacherId}|${o.studentId}`
     const existed = map.get(key)
     const base = existed ?? {
-      teacherName: teacher.name,
-      studentName: student.name,
+      teacherName: o.teacherName ?? `老师${o.teacherId}`,
+      studentName: o.studentName ?? `学生${o.studentId}`,
       teacherWant: false,
       studentWant: false,
       status: 'teacher-only' as PairView['status'],
-      updatedAt: r.createdAt,
+      updatedAt: o.createdAt ?? '',
     }
-    if (r.by === 'teacher') base.teacherWant = true
+    if (o.status === 0) base.teacherWant = true
     else base.studentWant = true
     base.status = base.teacherWant && base.studentWant ? 'matched' : base.teacherWant ? 'teacher-only' : 'student-only'
     if (!existed) map.set(key, base)
@@ -73,7 +108,6 @@ function schedCompact(availability?: number[]): string {
 function logout() {
   store.logout()
   ElMessage.success('已退出登录')
-  // 留在 /admin：退出后原地展示管理员登录卡（公共登录页不设管理员入口）
   router.replace('/admin')
 }
 
@@ -93,8 +127,9 @@ async function adminLogin() {
   }
   loginLoading.value = true
   try {
-    store.login(loginForm.phone, loginForm.password, 'admin')
+    await store.login(loginForm.phone, loginForm.password, 'admin')
     ElMessage.success('管理员登录成功')
+    loadAdminData().catch(() => {})
   } catch (e) {
     loginError.value = (e as Error).message
   } finally {
@@ -148,7 +183,7 @@ async function adminLogin() {
 
       <el-alert
         class="admin-tip"
-        title="前端演示模式：数据保存在浏览器 localStorage；接入后端后替换为真实接口。"
+        title="数据已接入后端接口（/api/admin/*），展示为数据库真实数据。"
         type="info"
         :closable="false"
         show-icon
@@ -176,10 +211,6 @@ async function adminLogin() {
               <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
               </el-table-column>
-              <el-table-column prop="phone" label="电话" width="130" />
-              <el-table-column prop="createdAt" label="入驻时间" width="170">
-                <template #default="{ row }">{{ new Date(row.createdAt).toLocaleString('zh-CN') }}</template>
-              </el-table-column>
             </el-table>
           </el-tab-pane>
 
@@ -199,9 +230,6 @@ async function adminLogin() {
                 <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
               </el-table-column>
               <el-table-column prop="note" label="备注" min-width="160" />
-              <el-table-column prop="createdAt" label="入驻时间" width="170">
-                <template #default="{ row }">{{ new Date(row.createdAt).toLocaleString('zh-CN') }}</template>
-              </el-table-column>
             </el-table>
           </el-tab-pane>
 

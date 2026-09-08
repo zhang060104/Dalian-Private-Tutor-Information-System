@@ -54,3 +54,10 @@
 - ⚠️ 门户「教员库」`Tutor` mock 类型（评分/标签/授课方式等营销展示字段）保留原样，不接数据库
 - ⚠️ 旧 localStorage（v2）账号数据需清缓存/重新播种
 - 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 前端接入后端 API（告别 localStorage 演示）
+- 新增 `src/api/http.ts`（axios 实例：请求自动带 Bearer 令牌、响应统一解包 `{code,message,data}` 并弹错）、`src/api/index.ts`（登录/注册/列表/双向选择/管理端接口封装）
+- `stores/system.ts` 由 localStorage 演示改为后端 API：登录/注册/列表/选择关系全部走 `/api/*`；令牌存 `localStorage[tutor_token]`，当前登录人缓存 `tutor_system_current` 供路由守卫
+- 工作台/学生空间/管理后台 `onMounted` 调 `loadAll`（刷新页面后自动拉取）；管理后台改用 `/api/admin/*` 接口加载全局数据
+- 后端实体（nickname/subject/description/timeTable1~7）在前端 store 层映射为前端类型（name/subjects/intro/availability）
+- `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）

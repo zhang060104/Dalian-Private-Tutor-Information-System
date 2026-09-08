@@ -43,7 +43,8 @@ export type Role = 'admin' | 'teacher' | 'student'
 
 /** 账号基类（登录标识为 phone，数据库无 username 字段） */
 export interface AccountBase {
-  password: string
+  id?: number
+  password?: string
   role: Role
   name: string
   phone: string

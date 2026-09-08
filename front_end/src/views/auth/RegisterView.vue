@@ -66,7 +66,7 @@ async function submit() {
   submitting.value = true
   try {
     if (isTeacher.value) {
-      store.registerTeacher({
+      await store.registerTeacher({
         password: form.password,
         name: form.name.trim(),
         gender: form.gender,
@@ -77,7 +77,7 @@ async function submit() {
         availability: [...form.availability],
       })
     } else {
-      store.registerStudent({
+      await store.registerStudent({
         password: form.password,
         name: form.name.trim(),
         gender: form.gender,
@@ -89,7 +89,7 @@ async function submit() {
       })
     }
     // 入驻成功自动登录进入对应工作台
-    store.login(form.phone.trim(), form.password, role.value)
+    await store.login(form.phone.trim(), form.password, role.value)
     ElMessage.success('入驻成功，欢迎加入大连私人家教中心！')
     router.replace(ROLE_HOME[role.value])
   } catch (e) {

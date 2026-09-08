@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSystemStore } from '@/stores/system'
 import { decodeSubjects, scheduleSummary } from '@/utils/availability'
@@ -9,6 +9,10 @@ import type { TeacherAccount } from '@/types'
 /** 学生空间：查看自己的资料 + 选择老师（老师也可反向选择学生，双向即匹配） */
 
 const store = useSystemStore()
+
+onMounted(() => {
+  store.loadAll().catch(() => {})
+})
 
 const me = computed(() => (store.current?.role === 'student' ? store.current : null))
 const rels = computed(() => (me.value ? store.relationsOfStudent(me.value.phone) : []))
