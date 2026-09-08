@@ -61,3 +61,11 @@
 - 工作台/学生空间/管理后台 `onMounted` 调 `loadAll`（刷新页面后自动拉取）；管理后台改用 `/api/admin/*` 接口加载全局数据
 - 后端实体（nickname/subject/description/timeTable1~7）在前端 store 层映射为前端类型（name/subjects/intro/availability）
 - `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
+
+## 2026-09-08 ｜ 合并 main 进 feature/backend-service：学生空间保留「老师列表已下线」
+- 冲突文件：`src/views/member/StudentHomeView.vue` —— main（PR #8）移除老师列表区块，后端分支重新引入并接入 API
+- 解决结论：**保留 main 的删除**。学生页面内嵌老师选择列表业务上不成立（学生不该反过来挑选老师），选择动作由老师侧发起；学生端仅展示自己的资料 + 匹配关系统计
+- 后端分支的必要改动全部保留：`onMounted → store.loadAll()`、登录标识 `username → phone`、`r.teacherUsername → r.teacherPhone`、年级展示 `{{ me.grade }} → {{ gradeLabel(me.grade) }}`、移除 `guardian` 展示
+- 同步删除仅服务老师列表的死代码：import（`ElMessage` / `TeacherAccount`）、helper（`teacherScheduleText` / `stateOf` / `toggle`）及卡片样式
+- 依赖补齐：`npm install` 安装 axios（`src/api/http.ts` 依赖，此前未安装导致 type-check 报 TS2307）
+- `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
