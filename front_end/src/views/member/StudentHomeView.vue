@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useSystemStore } from '@/stores/system'
-import { decodeGrades, decodeSubjects, scheduleSummary } from '@/utils/availability'
-import type { TeacherAccount } from '@/types'
+import { decodeSubjects, scheduleSummary } from '@/utils/availability'
 
-/** 学生空间：查看自己的资料 + 选择老师（老师也可反向选择学生，双向即匹配） */
+/** 学生空间：查看自己的资料（老师匹配选择已下线） */
 
 const store = useSystemStore()
 
@@ -22,27 +20,6 @@ const myScheduleText = computed(() => {
 const chosenByMe = computed(() => new Set(rels.value.filter((r) => r.by === 'student').map((r) => r.teacherUsername)))
 const chosenMe = computed(() => new Set(rels.value.filter((r) => r.by === 'teacher').map((r) => r.teacherUsername)))
 const matchedCount = computed(() => [...chosenByMe.value].filter((u) => chosenMe.value.has(u)).length)
-
-/** 老师空余时间摘要（最多 3 天） */
-function teacherScheduleText(availability?: number[]): string {
-  const busy = scheduleSummary(availability).filter((x) => !x.includes('无空闲'))
-  if (!busy.length) return '未填写'
-  return busy.length > 3 ? `${busy.slice(0, 3).join('；')} 等` : busy.join('；')
-}
-
-function stateOf(t: TeacherAccount) {
-  const byMe = chosenByMe.value.has(t.username)
-  const byTeacher = chosenMe.value.has(t.username)
-  return { byMe, byTeacher, mutual: byMe && byTeacher }
-}
-
-function toggle(t: TeacherAccount) {
-  try {
-    store.toggleSelect(t.username, 'student')
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  }
-}
 </script>
 
 <template>
@@ -79,57 +56,6 @@ function toggle(t: TeacherAccount) {
           <b>{{ matchedCount }}</b><span>已匹配</span>
         </div>
       </div>
-    </section>
-
-    <!-- 老师池：学生选老师 -->
-    <section class="section">
-      <div class="section-head">
-        <h3 class="section-title">老师列表 · 选择心仪的老师</h3>
-        <p class="section-desc">老师对你的选择会显示在卡片上；双方互选即视为匹配成功，可联系试听。</p>
-      </div>
-
-      <div v-if="store.teachers.length" class="card-grid">
-        <article v-for="t in store.teachers" :key="t.username" class="person-card">
-          <header class="person-head">
-            <div class="person-avatar">{{ t.name.slice(0, 1) }}</div>
-            <div>
-              <h4 class="person-name">
-                {{ t.name }}老师
-                <el-tag v-if="stateOf(t).mutual" size="small" type="success" effect="dark">✓ 已匹配</el-tag>
-              </h4>
-              <p class="person-meta">
-                {{ t.gender }}
-              </p>
-            </div>
-          </header>
-
-          <p class="person-intro">{{ t.intro }}</p>
-          <p class="person-sched">可约时间：{{ teacherScheduleText(t.availability) }}</p>
-
-          <div class="person-skills">
-            <el-tag v-for="s in decodeSubjects(t.subjects)" :key="s" size="small" effect="plain">{{ s }}</el-tag>
-            <el-tag v-for="g in decodeGrades(t.grades)" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
-          </div>
-
-          <footer class="person-foot">
-            <div class="person-tags">
-              <el-tag v-if="stateOf(t).byMe" size="small">我选择了 TA</el-tag>
-              <el-tag v-if="stateOf(t).byTeacher" size="small" type="warning">TA 选择了我</el-tag>
-            </div>
-            <el-button
-              v-if="!stateOf(t).mutual"
-              size="small"
-              :type="stateOf(t).byMe ? 'default' : 'primary'"
-              round
-              @click="toggle(t)"
-            >
-              {{ stateOf(t).byMe ? '取消选择' : stateOf(t).byTeacher ? '接受 TA · 选择 TA' : '选择这位老师' }}
-            </el-button>
-            <el-button v-else size="small" type="success" round disabled>已匹配</el-button>
-          </footer>
-        </article>
-      </div>
-      <el-empty v-else description="暂无入驻老师" />
     </section>
   </div>
 </template>
@@ -230,122 +156,5 @@ function toggle(t: TeacherAccount) {
 .stat--match {
   background: rgba(255, 255, 255, 0.95);
   color: var(--brand-color-dark);
-}
-
-.section {
-  max-width: var(--container-width);
-  margin: 0 auto;
-  width: calc(100% - 32px);
-  background: #fff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-color);
-  padding: 24px 26px;
-}
-
-.section-head {
-  margin-bottom: 18px;
-}
-
-.section-title {
-  font-size: 17px;
-  color: var(--text-main);
-}
-
-.section-desc {
-  margin-top: 6px;
-  font-size: 13px;
-  color: var(--text-tertiary);
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 14px;
-}
-
-.person-card {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: box-shadow 0.15s, border-color 0.15s;
-}
-
-.person-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-strong);
-}
-
-.person-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.person-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--brand-color-light);
-  color: var(--brand-color-dark);
-  font-size: 19px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.person-name {
-  font-size: 16px;
-  color: var(--text-main);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.person-meta {
-  margin-top: 3px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.person-intro {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
-
-.person-sched {
-  font-size: 12px;
-  color: var(--brand-color-dark);
-  background: var(--brand-color-light);
-  border-radius: 8px;
-  padding: 6px 10px;
-  line-height: 1.6;
-}
-
-.person-skills {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-
-.person-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: auto;
-}
-
-.person-tags {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
 }
 </style>
