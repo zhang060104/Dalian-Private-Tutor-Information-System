@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { SwitchButton } from '@element-plus/icons-vue'
 import { useSystemStore } from '@/stores/system'
 import { decodeGrades, decodeSubjects, scheduleSummary } from '@/utils/availability'
+import type { ProfileReview } from '@/types'
 
 /**
  * 独立管理后台（/admin）
@@ -19,6 +20,72 @@ const router = useRouter()
 const teachers = computed(() => store.teachers)
 const students = computed(() => store.students)
 const adminName = computed(() => (store.current?.role === 'admin' ? store.current.name : '管理员'))
+
+/* ---------------- 个人资料修改审核 ---------------- */
+
+const reviews = computed(() => store.reviews)
+const reviewTabLabel = computed(() => (reviews.value.length ? `资料审核（${reviews.value.length}）` : '资料审核'))
+
+const detailVisible = ref(false)
+const detail = ref<ProfileReview | null>(null)
+const reviewBusy = ref(false)
+
+function openDetail(r: ProfileReview) {
+  detail.value = r
+  detailVisible.value = true
+}
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleString('zh-CN')
+}
+
+function fieldLabels(r: ProfileReview): string {
+  return r.fields.map((f) => f.label).join('、')
+}
+
+async function approveReview(r: ProfileReview) {
+  try {
+    await ElMessageBox.confirm(
+      `确认通过「${r.name}（${r.username}）」的资料修改？新资料将立即生效并对外展示。`,
+      '通过审核',
+      { type: 'warning', confirmButtonText: '通过并生效', cancelButtonText: '再想想' },
+    )
+  } catch {
+    return
+  }
+  reviewBusy.value = true
+  try {
+    store.approveProfileReview(r.id)
+    ElMessage.success('已通过，新资料已生效')
+    detailVisible.value = false
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    reviewBusy.value = false
+  }
+}
+
+async function rejectReview(r: ProfileReview) {
+  try {
+    await ElMessageBox.confirm(
+      `确认驳回「${r.name}（${r.username}）」的资料修改？将保留其当前资料，申请人需重新提交。`,
+      '驳回申请',
+      { type: 'warning', confirmButtonText: '确认驳回', cancelButtonText: '再想想' },
+    )
+  } catch {
+    return
+  }
+  reviewBusy.value = true
+  try {
+    store.rejectProfileReview(r.id)
+    ElMessage.success('已驳回，原资料保持不变')
+    detailVisible.value = false
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    reviewBusy.value = false
+  }
+}
 
 interface PairView {
   teacherName: string
@@ -143,6 +210,9 @@ async function adminLogin() {
         <div class="admin-stat admin-stat--warn">
           <b>{{ pendingPairs }}</b><span>待双向确认</span>
         </div>
+        <div class="admin-stat admin-stat--warn">
+          <b>{{ reviews.length }}</b><span>待审资料修改</span>
+        </div>
       </div>
 
       <el-alert
@@ -156,6 +226,32 @@ async function adminLogin() {
       <!-- 数据面板 -->
       <div class="admin-panel">
         <el-tabs>
+          <el-tab-pane :label="reviewTabLabel">
+            <el-table :data="reviews" stripe>
+              <el-table-column label="提交人" min-width="150">
+                <template #default="{ row }">
+                  {{ row.name }}
+                  <el-tag :type="row.role === 'teacher' ? 'warning' : 'primary'" size="small" effect="plain">
+                    {{ row.role === 'teacher' ? '老师' : '学生' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="username" label="账号" width="120" />
+              <el-table-column label="修改内容" min-width="220">
+                <template #default="{ row }">{{ fieldLabels(row) }}</template>
+              </el-table-column>
+              <el-table-column label="提交时间" width="170">
+                <template #default="{ row }">{{ fmtTime(row.submittedAt) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="110" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" @click="openDetail(row)">查看详情</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-if="!reviews.length" description="暂无待审核的资料修改申请" :image-size="80" />
+          </el-tab-pane>
+
           <el-tab-pane label="入驻老师">
             <el-table :data="teachers" stripe>
               <el-table-column prop="username" label="账号" width="120" />
@@ -263,6 +359,31 @@ async function adminLogin() {
         </el-form>
       </div>
     </main>
+
+    <!-- 资料修改审核详情：旧值 → 新值 对比 -->
+    <el-dialog
+      v-model="detailVisible"
+      :title="detail ? `资料修改审核 · ${detail.name}（${detail.username}）` : ''"
+      width="560px"
+      top="8vh"
+      :close-on-click-modal="false"
+    >
+      <p v-if="detail" class="review-meta">
+        提交时间：{{ fmtTime(detail.submittedAt) }} · 审核通过前仍对外展示当前资料
+      </p>
+      <div v-if="detail" class="diff-list">
+        <div v-for="f in detail.fields" :key="f.label" class="diff-row">
+          <span class="diff-label">{{ f.label }}</span>
+          <span class="diff-old" :title="f.old">{{ f.old }}</span>
+          <span class="diff-arrow">→</span>
+          <span class="diff-new" :title="f.next">{{ f.next }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="danger" plain :loading="reviewBusy" @click="detail && rejectReview(detail)">驳 回</el-button>
+        <el-button type="primary" :loading="reviewBusy" @click="detail && approveReview(detail)">通过并生效</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -460,5 +581,55 @@ async function adminLogin() {
   width: 100%;
   letter-spacing: 6px;
   margin-top: 2px;
+}
+
+/* ---------- 资料审核详情 ---------- */
+
+.review-meta {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 14px;
+}
+
+.diff-list {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.diff-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 24px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+.diff-row + .diff-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.diff-label {
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+}
+
+.diff-old {
+  color: var(--danger-color);
+  text-decoration: line-through;
+  text-decoration-color: rgba(214, 69, 69, 0.4);
+  word-break: break-all;
+}
+
+.diff-arrow {
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.diff-new {
+  color: var(--success-color);
+  font-weight: 600;
+  word-break: break-all;
 }
 </style>
