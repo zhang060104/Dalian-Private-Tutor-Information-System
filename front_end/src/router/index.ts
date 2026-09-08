@@ -13,7 +13,6 @@ const router = createRouter({
       component: () => import('@/layouts/PortalLayout.vue'),
       children: [
         { path: '', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { title: '首页' } },
-        { path: 'tutors', name: 'tutors', component: () => import('@/views/TutorsView.vue'), meta: { title: '教员库' } },
         { path: 'about', name: 'about', component: () => import('@/views/AboutView.vue'), meta: { title: '关于中心' } },
         // —— 角色账号体系 ——
         { path: 'login', name: 'login', component: () => import('@/views/auth/LoginView.vue'), meta: { title: '登录' } },
@@ -34,6 +33,18 @@ const router = createRouter({
           name: 'student-home',
           component: () => import('@/views/member/StudentHomeView.vue'),
           meta: { title: '学生空间', role: 'student' },
+        },
+        {
+          path: 'match',
+          name: 'match',
+          component: () => import('@/views/match/MatchView.vue'),
+          meta: { title: '双选大厅', roles: ['teacher', 'student'] },
+        },
+        {
+          path: 'person/:role/:id',
+          name: 'person',
+          component: () => import('@/views/match/PersonProfileView.vue'),
+          meta: { title: '资料详情', roles: ['teacher', 'student'] },
         },
       ],
     },
@@ -57,19 +68,20 @@ function homeOf(role: Role): string {
 
 router.beforeEach((to) => {
   const need = to.meta.role as Role | undefined
+  const needRoles = to.meta.roles as Role[] | undefined
   const cur = loadCurrentUser()
 
-  // 需要角色的页面：
-  if (need) {
+  // 需要角色的页面（单个 role 或 roles 数组）
+  const required = needRoles?.length ? needRoles : need ? [need] : []
+  if (required.length) {
     if (!cur) {
-      // 未登录访问 /admin：放行 —— 管理后台自带登录页，不走公共登录页，
-      // 保证"管理员登录窗口"不在门户/公共登录页上出现。
-      if (need === 'admin') return true
-      // 老师 / 学生页面：去公共登录页，登录后按 redirect 带回
+      // 未登录访问 /admin：放行 —— 管理后台自带登录页，不走公共登录页
+      if (required.length === 1 && required[0] === 'admin') return true
+      // 其他需登录页：去公共登录页，登录后按 redirect 带回
       return { path: '/login', query: { redirect: to.fullPath } }
     }
     // 已登录但角色不符 → 各自的首页
-    if (cur.role !== need) return { path: homeOf(cur.role) }
+    if (!required.includes(cur.role)) return { path: homeOf(cur.role) }
   }
 
   // 已登录再访问公共登录页 → 去对应首页（管理员回独立后台）

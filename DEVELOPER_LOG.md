@@ -92,3 +92,36 @@
 - **前端**：学生/老师面板「我的资料」+ 修改弹窗 + 待审撤销；管理后台「资料审核」Tab + 字段级新旧对比（通过/驳回）
 - 验证：`mvn compile` BUILD SUCCESS（34 源文件）；`npm run type-check` 通过
 - 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 14:00 ｜ 分支清理（Claw 助手）
+
+- **分支盘点**：
+  - `feature/backend-service`（PR #9，open）：领先 main 7 commits / 落后 0，**可干净合并**，保留
+  - `feature/remove-student-teacher-list`（PR #8，merged）：全部提交已在 main 内，**远程分支删除**
+  - 没有冲突无法合并的分支
+- **删除命令**：`git push origin :refs/heads/feature/remove-student-teacher-list`（exit 0）
+- **prune 后**：`git fetch --prune` + packed-refs 自动同步，本地 tracking 引用已清理
+- **最终远程分支**：仅 `main` 与 `feature/backend-service`（PR #9 待 merge）
+- 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 前端 8 项优化：数据源真实化 + 双选大厅 + 信用分（Claw 助手）
+
+- **1 · 年级语义修正（按数据库文档）**：`GRADE_LEVELS` 增加 `{value:17,label:'已毕业'}`；
+  老师入驻/修改资料明确标注「可授年级（能教哪个学段就选哪个，含已毕业/在职）」，不再是混淆的自身年级。
+  同步在数据库设计文档补记 `17=已毕业`、`credit 默认 100`。
+- **2 · 移除 mock 数据与提示**：删除 `data/tutors.ts` 的 `TUTORS`/`GRADE_OPTIONS`、`Tutor` 类型、
+  `TutorCard.vue`、公开 mock 版 `TutorsView.vue`；删除 LoginView「演示账号/一键填入」、
+  各工作台「演示模式」提示条；`/tutors` 路由移除（教员浏览并入登录后的双选大厅）。
+- **3 · 工作台不带对方列表 + 投递**：老师/学生个人面板（/teacher/home、/student/home）只保留
+  「我的资料 + 修改（管理员审核）」与信用分，删净老师/学生列表与「选择 TA」。
+- **4 · 全站禁选中**：`styles/index.css` 全局 `user-select:none`（input/textarea/contenteditable 例外）。
+- **5 · 主页精简**：HomeView 删除 FAQ、明星教员、营销数据面板，只留「hero + 四步使用引导 + CTA」。
+- **6 · 双选大厅含老师/学生两个池**：新增登录后页面 `/match`（MatchView.vue），el-tabs 分「老师/学生」，
+  对「另一侧」才显示「投递简历」（可撤回）；卡片含信用分。
+- **7 · 单一个人资料页**：新增 `/person/:role/:id`（PersonProfileView.vue），纯净展示一位老师/学生的
+  完整资料 + 空余时间，无任何列表；可从此投递。
+- **8 · 信用分展示（替代星级）**：`TeacherAccount`/`StudentAccount` 增加 `credit`，store 映射自后端
+  `dto.credit`；工作台/双选卡/个人资料页均以数字展示「信用分」（后端默认 100），彻底移除 mock 星级评分。
+- 路由守卫支持 `roles: ['teacher','student']` 数组（登录后按角色，未登录去 /login 带回 redirect）。
+- 验证：`npm run type-check` 通过；dev server（5180）各新页面模块均 200。
+- 提交人：Claw 助手 / zhang060104 授权

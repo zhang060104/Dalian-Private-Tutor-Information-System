@@ -19,10 +19,10 @@ const PROCESS = [
 ]
 
 const NUMBERS = [
-  { num: '8+', label: '年本地服务经验' },
-  { num: '500+', label: '认证教员储备' },
-  { num: '96%', label: '家长满意度' },
-  { num: '3审', label: '师资准入标准' },
+  { num: '本地', label: '扎根大连本地服务' },
+  { num: '双向', label: '老师学生双向选择' },
+  { num: '真实', label: '资料与信用分实名展示' },
+  { num: '透明', label: '入驻信息中心可查' },
 ]
 </script>
 

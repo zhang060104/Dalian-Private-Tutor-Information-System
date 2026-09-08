@@ -8,7 +8,7 @@ import { encodeSubjects } from '@/utils/availability'
 import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import type { Role } from '@/types'
 
-/** 老师/学生入驻：注册账号 + 填写个人信息（演示模式，数据存 localStorage） */
+/** 老师/学生入驻：注册账号 + 填写个人信息（提交至后端） */
 
 const store = useSystemStore()
 const route = useRoute()
@@ -156,10 +156,11 @@ async function submit() {
               <el-checkbox v-for="s in SUBJECT_OPTIONS" :key="s" :value="s" border>{{ s }}</el-checkbox>
             </el-checkbox-group>
           </el-form-item>
-          <el-form-item label="可授年级" required>
-            <el-select v-model="form.grade" placeholder="选择可授年级" style="width: 100%">
+          <el-form-item label="可授年级（能教哪个学段就选哪个）" required>
+            <el-select v-model="form.grade" placeholder="选择可授年级（含已毕业/在职教师）" style="width: 100%">
               <el-option v-for="g in GRADE_LEVELS" :key="g.value" :label="g.label" :value="g.value" />
             </el-select>
+            <div class="field-hint">此处填你<b>能胜任授课</b>的学段（如大学生可教高一，也可选「已毕业」表示在职/有经验教师），并非你的在读年级。</div>
           </el-form-item>
           <el-form-item label="个人简介（教学经验 / 风格）" required>
             <el-input v-model="form.intro" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="一句话介绍自己，帮助学生了解你" />
@@ -242,6 +243,14 @@ async function submit() {
   margin-top: 6px;
   font-size: 13px;
   color: var(--text-tertiary);
+}
+
+.field-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-tertiary);
+  width: 100%;
 }
 
 .reg-roles {

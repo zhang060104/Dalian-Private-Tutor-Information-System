@@ -40,6 +40,7 @@ function teacherFromDto(dto: TeacherDto): TeacherAccount {
     gender: (dto.gender as '男' | '女') ?? '男',
     subjects: dto.subject ?? 0,
     grade: dto.grade ?? 0,
+    credit: dto.credit ?? 100,
     intro: dto.description ?? '',
     availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
   }
@@ -56,6 +57,7 @@ function studentFromDto(dto: StudentDto): StudentAccount {
     gender: (dto.gender as '男' | '女') ?? '男',
     grade: dto.grade ?? 0,
     subjects: dto.subject ?? 0,
+    credit: dto.credit ?? 100,
     note: dto.description || undefined,
     availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
   }
@@ -68,12 +70,12 @@ function accountFromLogin(res: LoginResult): AnyAccount {
   if (res.role === 'teacher') {
     return {
       id: res.id, password: '', role: 'teacher', name: res.nickname, phone: res.phone, createdAt: '',
-      gender: '男', subjects: 0, grade: 0, intro: '', availability: [0, 0, 0, 0, 0, 0, 0],
+      gender: '男', subjects: 0, grade: 0, credit: 100, intro: '', availability: [0, 0, 0, 0, 0, 0, 0],
     }
   }
   return {
     id: res.id, password: '', role: 'student', name: res.nickname, phone: res.phone, createdAt: '',
-    gender: '男', grade: 0, subjects: 0, availability: [0, 0, 0, 0, 0, 0, 0],
+    gender: '男', grade: 0, subjects: 0, credit: 100, availability: [0, 0, 0, 0, 0, 0, 0],
   }
 }
 
@@ -174,7 +176,7 @@ export const useSystemStore = defineStore('system', {
     },
 
     /** 老师入驻 */
-    async registerTeacher(payload: Omit<TeacherAccount, 'role' | 'createdAt' | 'id'>): Promise<void> {
+    async registerTeacher(payload: Omit<TeacherAccount, 'role' | 'createdAt' | 'id' | 'credit'>): Promise<void> {
       await api.registerTeacher({
         nickname: payload.name,
         password: payload.password,
@@ -194,7 +196,7 @@ export const useSystemStore = defineStore('system', {
     },
 
     /** 学生入驻 */
-    async registerStudent(payload: Omit<StudentAccount, 'role' | 'createdAt' | 'id'>): Promise<void> {
+    async registerStudent(payload: Omit<StudentAccount, 'role' | 'createdAt' | 'id' | 'credit'>): Promise<void> {
       await api.registerStudent({
         nickname: payload.name,
         password: payload.password,

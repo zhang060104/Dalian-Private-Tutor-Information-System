@@ -12,7 +12,6 @@ const store = useSystemStore()
 
 const NAV_ITEMS = [
   { path: '/', label: '首页' },
-  { path: '/tutors', label: '教员库' },
   { path: '/about', label: '关于中心' },
 ] as const
 
@@ -21,12 +20,18 @@ const mobileMenuOpen = ref(false)
 
 /** 顶栏登录态（管理员不展示门户入口，其后台为独立 /admin） */
 const loggedIn = computed(() => !!store.current)
+const isMember = computed(() => store.current?.role === 'teacher' || store.current?.role === 'student')
 const roleHomePath = computed(() => {
   const role = store.current?.role
   if (role === 'teacher') return '/teacher/home'
   if (role === 'student') return '/student/home'
   return ''
 })
+
+/** 登录后的可见导航：额外提供「双选大厅」 */
+const memberNav = computed(() =>
+  isMember.value ? [...NAV_ITEMS.slice(0, 1), { path: '/match', label: '双选大厅' }, ...NAV_ITEMS.slice(1)] : NAV_ITEMS,
+)
 
 function logout() {
   store.logout()
@@ -47,7 +52,7 @@ function logout() {
 
         <nav class="nav">
           <router-link
-            v-for="item in NAV_ITEMS"
+            v-for="item in memberNav"
             :key="item.path"
             :to="item.path"
             class="nav-link"
@@ -72,9 +77,10 @@ function logout() {
               <el-icon><SwitchButton /></el-icon>
             </button>
           </template>
-          <router-link v-else to="/login" class="header-login">登录 / 入驻</router-link>
-
-          <router-link to="/register" class="cta-btn">入驻平台</router-link>
+          <template v-else>
+            <router-link to="/login" class="header-login">登录 / 入驻</router-link>
+            <router-link to="/register" class="cta-btn">入驻平台</router-link>
+          </template>
           <button class="menu-toggle" aria-label="菜单" @click="mobileMenuOpen = !mobileMenuOpen">
             <span></span><span></span><span></span>
           </button>
@@ -84,7 +90,7 @@ function logout() {
       <!-- 移动端菜单 -->
       <div v-if="mobileMenuOpen" class="mobile-menu">
         <router-link
-          v-for="item in NAV_ITEMS"
+          v-for="item in memberNav"
           :key="item.path"
           :to="item.path"
           class="mobile-link"
@@ -96,6 +102,7 @@ function logout() {
           <router-link v-if="roleHomePath" :to="roleHomePath" class="mobile-link" @click="mobileMenuOpen = false">
             我的面板（{{ store.current?.name }} · {{ store.roleLabel }}）
           </router-link>
+          <router-link to="/login" class="mobile-link" @click="mobileMenuOpen = false">退出登录</router-link>
         </template>
         <router-link v-else to="/login" class="mobile-link" @click="mobileMenuOpen = false">登录 / 入驻</router-link>
       </div>

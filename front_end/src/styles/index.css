@@ -50,6 +50,23 @@
   box-sizing: border-box;
 }
 
+/* 全站默认禁止光标选中文字（表单输入框 / 文本域 / 可编辑区例外，保证可正常输入） */
+*,
+*::before,
+*::after {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable='true'],
+.el-input__inner,
+.el-textarea__inner {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 html {
   scroll-behavior: smooth;
 }

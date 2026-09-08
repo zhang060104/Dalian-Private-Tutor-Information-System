@@ -103,3 +103,17 @@
 - 管理后台：新增「资料审核」Tab（含待审统计卡）+ 字段级新旧对比弹窗（旧值删除线 → 新值绿色），支持通过（新资料立即生效）/ 驳回
 - 与 PR #10 的差异：数据源由本地缓存改为后端 API；学生去掉 `guardian`（数据库无该字段）；联系电话不可改（`updateProfile` 不含 phone）
 - `mvn compile` BUILD SUCCESS；`npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
+
+## 2026-09-08 ｜ 前端 8 项优化（真实数据 + 双选大厅 + 信用分）
+- 类型：`TeacherAccount`/`StudentAccount` 增加 `credit`；移除 mock `Tutor` 类型；`GRADE_LEVELS` 增加 `17=已毕业`
+- store：`teacherFromDto`/`studentFromDto`/`accountFromLogin` 映射 `credit`（后端默认 100）；
+  `registerTeacher`/`registerStudent` 的入参 `Omit` 补充排除 `credit`
+- 常量：`data/tutors.ts` 删除 `TUTORS` mock 数组与 `GRADE_OPTIONS`，仅保留 `GRADE_LEVELS`/`gradeLabel`/`SUBJECT_OPTIONS`
+- 页面删除：`components/TutorCard.vue`、`views/TutorsView.vue`（mock 教员库）；路由移除 `/tutors`
+- 新增：`views/match/MatchView.vue`（双选大厅，老师/学生两池）、`views/match/PersonProfileView.vue`（单一个人资料）
+- 新增路由：`/match`、`/person/:role/:id`，守卫支持 `roles` 数组
+- 工作台 `TeacherHomeView`/`StudentHomeView`：删净对方列表与「选择 TA」，仅保留我的资料+修改+信用分
+- `LoginView`：移除演示账号/一键填入；`HomeView`：删除 FAQ/明星教员/营销数据，精简为使用引导
+- 全局 `styles/index.css`：全站 `user-select:none`（输入类控件例外）
+- `AboutView`：营销数字改为真实平台价值表述
+- `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）

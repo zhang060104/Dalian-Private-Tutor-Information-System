@@ -7,7 +7,10 @@ import { GRADE_LEVELS, SUBJECT_OPTIONS, gradeLabel } from '@/data/tutors'
 import { decodeSubjects, encodeSubjects, scheduleSummary } from '@/utils/availability'
 import type { ProfileReviewField } from '@/types'
 
-/** 学生空间：查看自己的资料；修改需提交管理员审核，审核期间沿用当前资料 */
+/**
+ * 学生空间：只展示「我的资料」+ 资料修改（管理员审核）。
+ * 不含任何老师列表——双向选择在「双选大厅」进行。
+ */
 
 const store = useSystemStore()
 
@@ -17,7 +20,6 @@ onMounted(() => {
 })
 
 const me = computed(() => (store.current?.role === 'student' ? store.current : null))
-const rels = computed(() => (me.value ? store.relationsOfStudent(me.value.phone) : []))
 
 const mySubjects = computed(() => (me.value ? decodeSubjects(me.value.subjects) : []))
 const myScheduleText = computed(() => {
@@ -26,16 +28,12 @@ const myScheduleText = computed(() => {
   return busy.length ? busy.join('；') : '未填写空余时间'
 })
 
-const chosenByMe = computed(() => new Set(rels.value.filter((r) => r.by === 'student').map((r) => r.teacherPhone)))
-const chosenMe = computed(() => new Set(rels.value.filter((r) => r.by === 'teacher').map((r) => r.teacherPhone)))
-const matchedCount = computed(() => [...chosenByMe.value].filter((u) => chosenMe.value.has(u)).length)
-
 /* ---------------- 个人资料展示 / 修改（管理员审核制） ---------------- */
 
 const pending = computed(() => (me.value ? store.myReview : null))
 
-function fmtSched(availability?: number[]): string {
-  const busy = scheduleSummary(availability).filter((s) => !s.includes('无空闲'))
+function schedText(availability?: number[]): string {
+  const busy = scheduleSummary(availability).filter((x) => !x.includes('无空闲'))
   return busy.length ? busy.join('；') : '未填写'
 }
 
@@ -80,7 +78,7 @@ async function submitEdit() {
   push('年级', gradeLabel(me.value.grade), gradeLabel(form.grade))
   push('辅导科目', decodeSubjects(me.value.subjects).join('、'), decodeSubjects(nextSubjects).join('、'))
   push('备注', me.value.note ?? '', form.note.trim())
-  push('空余时间', fmtSched(me.value.availability), fmtSched(form.availability))
+  push('空余时间', schedText(me.value.availability), schedText(form.availability))
   if (!fields.length) {
     ElMessage.info('资料没有任何改动')
     return
@@ -131,76 +129,61 @@ async function cancelPending() {
 
 <template>
   <div class="member-page">
-    <el-alert
-      class="demo-tip"
-      title="当前为前端演示模式：账号与选择关系保存在本浏览器 localStorage，接入后端后自动切换为真实数据。"
-      type="info"
-      :closable="false"
-      show-icon
-    />
+    <div class="container">
+      <!-- 欢迎 -->
+      <section v-if="me" class="welcome">
+        <div class="welcome-main">
+          <div class="welcome-avatar">{{ me.name.slice(0, 1) }}</div>
+          <div>
+            <h2 class="welcome-title">{{ me.name }}，欢迎回来 👋</h2>
+            <p class="welcome-sub">
+              登录账号：{{ me.phone }} · {{ gradeLabel(me.grade) }} · 辅导科目：{{ mySubjects.join('、') || '未选' }}
+            </p>
+            <p class="welcome-tags">
+              <el-tag size="small" type="warning" effect="plain">信用分 {{ me.credit }}</el-tag>
+            </p>
+          </div>
+        </div>
+      </section>
 
-    <!-- 欢迎 + 我的资料 -->
-    <section v-if="me" class="welcome">
-      <div class="welcome-main">
-        <div class="welcome-avatar">{{ me.name.slice(0, 1) }}</div>
-        <div>
-          <h2 class="welcome-title">{{ me.name }}，欢迎回来 👋</h2>
-          <p class="welcome-sub">
-            手机号：{{ me.phone }} · {{ gradeLabel(me.grade) }} · 辅导科目：{{ mySubjects.join('、') || '未选' }}
+      <!-- 我的资料（对外展示；修改需管理员审核） -->
+      <section v-if="me" class="section">
+        <div class="section-head">
+          <h3 class="section-title">我的资料</h3>
+          <p class="section-desc">
+            以下资料会展示在「双选大厅」中。修改需提交管理员审核，<b>审核通过前仍展示当前资料</b>。
           </p>
-          <p v-if="me.note" class="welcome-note">备注：{{ me.note }}</p>
-          <p class="welcome-sched">我的空余时间：{{ myScheduleText }}</p>
         </div>
-      </div>
-      <div class="welcome-stats">
-        <div class="stat">
-          <b>{{ chosenByMe.size }}</b><span>我选择的老师</span>
+
+        <el-alert
+          v-if="pending"
+          class="pending-tip"
+          :title="`资料修改申请审核中（提交于 ${fmtTime(pending.submittedAt)}），通过后新资料才会生效。`"
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <el-button link type="danger" @click="cancelPending">撤销申请</el-button>
+        </el-alert>
+
+        <el-descriptions :column="2" border class="profile-desc">
+          <el-descriptions-item label="姓名">{{ me.name }}</el-descriptions-item>
+          <el-descriptions-item label="性别">{{ me.gender }}</el-descriptions-item>
+          <el-descriptions-item label="手机号">{{ me.phone }}</el-descriptions-item>
+          <el-descriptions-item label="年级">{{ gradeLabel(me.grade) }}</el-descriptions-item>
+          <el-descriptions-item label="辅导科目">{{ mySubjects.join('、') || '未选' }}</el-descriptions-item>
+          <el-descriptions-item label="信用分">{{ me.credit }}</el-descriptions-item>
+          <el-descriptions-item label="备注" :span="2">{{ me.note || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="我的空余时间" :span="2">{{ myScheduleText }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="section-actions">
+          <el-button type="primary" round :disabled="!!pending" @click="openEdit">
+            {{ pending ? '等待管理员审核' : '修改资料（需管理员审核）' }}
+          </el-button>
         </div>
-        <div class="stat">
-          <b>{{ chosenMe.size }}</b><span>选择我的老师</span>
-        </div>
-        <div class="stat stat--match">
-          <b>{{ matchedCount }}</b><span>已匹配</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- 我的资料（对外展示；修改需管理员审核） -->
-    <section v-if="me" class="section">
-      <div class="section-head">
-        <h3 class="section-title">我的资料</h3>
-        <p class="section-desc">
-          以下资料对老师与管理员可见。修改需提交管理员审核，<b>审核通过前仍展示当前资料</b>。
-        </p>
-      </div>
-
-      <el-alert
-        v-if="pending"
-        class="pending-tip"
-        :title="`资料修改申请审核中（提交于 ${fmtTime(pending.submittedAt)}），通过后新资料才会生效。`"
-        type="warning"
-        :closable="false"
-        show-icon
-      >
-        <el-button link type="danger" @click="cancelPending">撤销申请</el-button>
-      </el-alert>
-
-      <el-descriptions :column="2" border class="profile-desc">
-        <el-descriptions-item label="姓名">{{ me.name }}</el-descriptions-item>
-        <el-descriptions-item label="性别">{{ me.gender }}</el-descriptions-item>
-        <el-descriptions-item label="手机号">{{ me.phone }}</el-descriptions-item>
-        <el-descriptions-item label="年级">{{ gradeLabel(me.grade) }}</el-descriptions-item>
-        <el-descriptions-item label="辅导科目">{{ mySubjects.join('、') || '未选' }}</el-descriptions-item>
-        <el-descriptions-item label="备注">{{ me.note || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="我的空余时间" :span="2">{{ myScheduleText }}</el-descriptions-item>
-      </el-descriptions>
-
-      <div class="section-actions">
-        <el-button type="primary" round :disabled="!!pending" @click="openEdit">
-          {{ pending ? '等待管理员审核' : '修改资料（需管理员审核）' }}
-        </el-button>
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
 
   <!-- 修改资料对话框 -->
@@ -254,12 +237,6 @@ async function cancelPending() {
   min-height: 60vh;
 }
 
-.demo-tip {
-  max-width: var(--container-width);
-  margin: 0 auto 18px;
-  width: calc(100% - 32px);
-}
-
 .welcome {
   max-width: var(--container-width);
   margin: 0 auto 26px;
@@ -268,11 +245,6 @@ async function cancelPending() {
   border-radius: var(--radius-lg);
   color: #fff;
   padding: 26px 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  flex-wrap: wrap;
   box-shadow: var(--shadow-md);
 }
 
@@ -292,6 +264,7 @@ async function cancelPending() {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .welcome-title {
@@ -304,68 +277,40 @@ async function cancelPending() {
   opacity: 0.9;
 }
 
-.welcome-note {
-  margin-top: 6px;
-  font-size: 12.5px;
-  opacity: 0.85;
-}
-
-.welcome-sched {
+.welcome-tags {
   margin-top: 8px;
-  font-size: 12.5px;
-  opacity: 0.92;
-  max-width: 640px;
-}
-
-.welcome-stats {
   display: flex;
-  gap: 12px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.stat {
-  background: rgba(255, 255, 255, 0.16);
-  border-radius: 12px;
-  padding: 10px 18px;
-  text-align: center;
-  min-width: 86px;
+.welcome-tags :deep(.el-tag) {
+  background: rgba(255, 255, 255, 0.92);
 }
-
-.stat b {
-  display: block;
-  font-size: 22px;
-}
-
-.stat span {
-  font-size: 12px;
-  opacity: 0.9;
-}
-
-.stat--match {
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--brand-color-dark);
-}
-
-/* ---------- 我的资料 ---------- */
 
 .section {
   max-width: var(--container-width);
   margin: 0 auto;
   width: calc(100% - 32px);
+  background: #fff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  padding: 24px 26px;
 }
 
 .section-head {
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .section-title {
   font-size: 17px;
-  color: var(--text-primary);
+  color: var(--text-main);
 }
 
 .section-desc {
   margin-top: 6px;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
 .pending-tip {
@@ -373,7 +318,7 @@ async function cancelPending() {
 }
 
 .profile-desc {
-  background: var(--bg-primary, #fff);
+  background: #fff;
 }
 
 .section-actions {

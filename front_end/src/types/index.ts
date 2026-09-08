@@ -2,29 +2,6 @@
  * 大连私人家教中心 · 前端类型定义
  */
 
-/** 教员（家教老师） */
-export interface Tutor {
-  id: number
-  /** 姓名（脱敏展示：姓氏 + 老师） */
-  name: string
-  /** 性别：男 / 女 */
-  gender: '男' | '女'
-  /** 主教科目 */
-  subjects: string[]
-  /** 可教年级段 */
-  grades: string[]
-  /** 一句话简介 */
-  intro: string
-  /** 授课方式：上门 / 在线 */
-  mode: ('上门' | '在线')[]
-  /** 评分（0-5） */
-  rating: number
-  /** 累计授课（小时） */
-  taughtHours: number
-  /** 特色标签 */
-  tags: string[]
-}
-
 /** 中心联系方式（集中维护，便于替换真实信息） */
 export const CENTER_CONTACT = {
   name: '大连私人家教中心',
@@ -64,8 +41,10 @@ export interface TeacherAccount extends AccountBase {
   gender: '男' | '女'
   /** 主教科目：SUBJECT_OPTIONS 下标位掩码（bit i = SUBJECT_OPTIONS[i] 选中），由前端编解码 */
   subjects: number
-  /** 可授年级：单一数值编码（0幼儿园 1-6小学 7-9初中 10-12高中 13-16大学） */
+  /** 可授年级：单一数值编码（0幼儿园 1-6小学 7-9初中 10-12高中 13-16大学 17已毕业） */
   grade: number
+  /** 信用分（数据库 credit，订单成交/评价累积；页面以分数直观展示） */
+  credit: number
   intro: string
   /** 一周空余时间（7 个 int，见 WeekAvailability） */
   availability: WeekAvailability
@@ -75,10 +54,12 @@ export interface TeacherAccount extends AccountBase {
 export interface StudentAccount extends AccountBase {
   role: 'student'
   gender: '男' | '女'
-  /** 年级：单一数值编码（0幼儿园 1-6小学 7-9初中 10-12高中 13-16大学） */
+  /** 就读/在找老师对应的年级：单一数值编码（0幼儿园 1-6小学 7-9初中 10-12高中 13-16大学 17已毕业） */
   grade: number
   /** 需要辅导的科目：SUBJECT_OPTIONS 下标位掩码（单科即单 bit 置位） */
   subjects: number
+  /** 信用分（数据库 credit，订单成交/评价累积） */
+  credit: number
   note?: string
   /** 一周空余时间（7 个 int，见 WeekAvailability） */
   availability: WeekAvailability

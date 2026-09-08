@@ -17,20 +17,9 @@ const roleTabs: Array<{ role: PortalRole; label: string; sub: string; icon: stri
   { role: 'student', label: '学生登录', sub: '找家教 · 约课学习', icon: 'Reading' },
 ]
 
-/** 演示账号（前端演示模式，接入后端后移除），登录标识为手机号 */
-const DEMO: Record<PortalRole, { phone: string; password: string; tip: string }> = {
-  teacher: { phone: '13800000001', password: '123456', tip: '老师（王老师 · 数学/物理）' },
-  student: { phone: '13900000001', password: '123456', tip: '学生（同学甲 · 高一）' },
-}
-
 const activeRole = ref<PortalRole>('teacher')
 const form = reactive({ phone: '', password: '' })
 const loading = ref(false)
-
-function fillDemo() {
-  form.phone = DEMO[activeRole.value].phone
-  form.password = DEMO[activeRole.value].password
-}
 
 async function submit() {
   if (!form.phone.trim() || !form.password) {
@@ -151,13 +140,6 @@ function switchRole(role: PortalRole) {
               </template>
             </el-input>
           </el-form-item>
-
-          <div class="auth-actions">
-            <span class="auth-demo-tip">
-              {{ DEMO[activeRole].tip }} · 演示密码 123456
-            </span>
-            <el-button text type="primary" size="small" @click="fillDemo">一键填入</el-button>
-          </div>
 
           <el-button class="auth-submit" type="primary" size="large" :loading="loading" @click="submit">
             登 录
@@ -435,11 +417,6 @@ function switchRole(role: PortalRole) {
   align-items: center;
   justify-content: space-between;
   margin: -2px 0 18px;
-}
-
-.auth-demo-tip {
-  font-size: 12px;
-  color: var(--text-tertiary);
 }
 
 .auth-submit {
