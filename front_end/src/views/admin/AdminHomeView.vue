@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { SwitchButton } from '@element-plus/icons-vue'
 import { useSystemStore } from '@/stores/system'
-import { decodeGrades, decodeSubjects, scheduleSummary } from '@/utils/availability'
+import { decodeSubjects, scheduleSummary } from '@/utils/availability'
+import { gradeLabel } from '@/data/tutors'
 
 /**
  * 独立管理后台（/admin）
@@ -33,10 +34,10 @@ interface PairView {
 const pairs = computed<PairView[]>(() => {
   const map = new Map<string, PairView>()
   for (const r of store.relations) {
-    const teacher = store.users.find((u) => u.username === r.teacherUsername)
-    const student = store.users.find((u) => u.username === r.studentUsername)
+    const teacher = store.users.find((u) => u.phone === r.teacherPhone)
+    const student = store.users.find((u) => u.phone === r.studentPhone)
     if (!teacher || !student) continue
-    const key = `${r.teacherUsername}|${r.studentUsername}`
+    const key = `${r.teacherPhone}|${r.studentPhone}`
     const existed = map.get(key)
     const base = existed ?? {
       teacherName: teacher.name,
@@ -80,19 +81,19 @@ function logout() {
 const isAdmin = computed(() => store.current?.role === 'admin')
 
 /** 管理员登录（独立于公共登录页，仅地址栏直达 /admin 可进入） */
-const loginForm = reactive({ username: '', password: '' })
+const loginForm = reactive({ phone: '', password: '' })
 const loginLoading = ref(false)
 const loginError = ref('')
 
 async function adminLogin() {
   loginError.value = ''
-  if (!loginForm.username.trim() || !loginForm.password) {
-    loginError.value = '请输入管理员账号与密码'
+  if (!loginForm.phone.trim() || !loginForm.password) {
+    loginError.value = '请输入管理员手机号与密码'
     return
   }
   loginLoading.value = true
   try {
-    store.login(loginForm.username, loginForm.password, 'admin')
+    store.login(loginForm.phone, loginForm.password, 'admin')
     ElMessage.success('管理员登录成功')
   } catch (e) {
     loginError.value = (e as Error).message
@@ -158,7 +159,7 @@ async function adminLogin() {
         <el-tabs>
           <el-tab-pane label="入驻老师">
             <el-table :data="teachers" stripe>
-              <el-table-column prop="username" label="账号" width="120" />
+              <el-table-column prop="phone" label="手机号" width="130" />
               <el-table-column label="姓名" width="120">
                 <template #default="{ row }">{{ row.name }}（{{ row.gender }}）</template>
               </el-table-column>
@@ -167,9 +168,9 @@ async function adminLogin() {
                   <el-tag v-for="s in decodeSubjects(row.subjects)" :key="s" size="small" effect="plain">{{ s }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="可教年级" min-width="150">
+              <el-table-column label="可授年级" min-width="120">
                 <template #default="{ row }">
-                  <el-tag v-for="g in decodeGrades(row.grades)" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
+                  <el-tag size="small" type="success" effect="plain">{{ gradeLabel(row.grade) }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
@@ -184,19 +185,19 @@ async function adminLogin() {
 
           <el-tab-pane label="入驻学生">
             <el-table :data="students" stripe>
-              <el-table-column prop="username" label="账号" width="120" />
+              <el-table-column prop="phone" label="手机号" width="130" />
               <el-table-column label="姓名" width="120">
                 <template #default="{ row }">{{ row.name }}（{{ row.gender }}）</template>
               </el-table-column>
-              <el-table-column prop="grade" label="年级" width="130" />
+              <el-table-column label="年级" width="130">
+                <template #default="{ row }">{{ gradeLabel(row.grade) }}</template>
+              </el-table-column>
               <el-table-column label="辅导科目" min-width="120">
                 <template #default="{ row }">{{ decodeSubjects(row.subjects).join('、') || '未选' }}</template>
               </el-table-column>
               <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
               </el-table-column>
-              <el-table-column prop="guardian" label="家长" width="140" />
-              <el-table-column prop="phone" label="电话" width="130" />
               <el-table-column prop="note" label="备注" min-width="160" />
               <el-table-column prop="createdAt" label="入驻时间" width="170">
                 <template #default="{ row }">{{ new Date(row.createdAt).toLocaleString('zh-CN') }}</template>
@@ -237,12 +238,12 @@ async function adminLogin() {
         <p class="admin-login-sub">大连私人家教中心 · 内部管理入口</p>
 
         <el-form label-position="top" size="large" @submit.prevent="adminLogin">
-          <el-form-item label="管理员账号">
+          <el-form-item label="管理员手机号">
             <el-input
-              v-model="loginForm.username"
-              placeholder="请输入管理员账号"
+              v-model="loginForm.phone"
+              placeholder="请输入管理员手机号"
               clearable
-              autocomplete="username"
+              autocomplete="tel"
               @keyup.enter="adminLogin"
             />
           </el-form-item>

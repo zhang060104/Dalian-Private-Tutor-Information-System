@@ -44,3 +44,13 @@
 - ⚠️ 未改动 `Tutor`（教员库公开 mock 展示类型）：`data/tutors.ts` / `TutorCard` / `TutorsView` 的教龄、学历、课时费展示与排序保持原样
 - ⚠️ localStorage 已有旧账号数据的浏览器需清缓存/重新播种（键 `tutor_system_v2`），否则旧数据仍带这三字段
 - `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
+
+## 2026-09-08 ｜ 删除数据库无法支撑的业务 + 对齐后端（phone 登录 / 年级数值编码）
+- 登录标识由 `username` 改为 `phone`：`AccountBase` 移除 username，登录/入驻/管理后台表单统一用手机号；演示账号对齐数据库种子（老师 13800000001~3、学生 13900000001~3、管理员 13800000000，密码 123456）
+- 删除学生「家长称呼 guardian」字段：类型、入驻表单、学生空间、管理后台表格同步移除
+- 年级改**单一数值编码**：老师「可教年级」由位掩码多选改为单选 `grade:number`；学生年级由字符串改为数值 `grade:number`
+- `data/tutors.ts` 新增 `GRADE_LEVELS`（0幼儿园/1~6小学/7~9初中/10~12高中/13~16大学，17 项）+ `gradeLabel()`；`utils/availability.ts` 移除 `encodeGrades/decodeGrades`
+- `MatchRelation` 由 username 标识改为 phone；`stores/system.ts` localStorage 键升级 `tutor_system_v3`
+- ⚠️ 门户「教员库」`Tutor` mock 类型（评分/标签/授课方式等营销展示字段）保留原样，不接数据库
+- ⚠️ 旧 localStorage（v2）账号数据需清缓存/重新播种
+- 提交人：Claw 助手 / zhang060104 授权

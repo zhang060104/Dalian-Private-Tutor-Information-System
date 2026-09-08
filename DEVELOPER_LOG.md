@@ -60,3 +60,21 @@
   或在库里补 username 字段，需提前与前端负责人对齐
 - **后续**：数据库部分暂告一段落，**后端业务接口暂不开发**，等前端改造完成后再启动
 - 提交人：Claw 助手 / zhang060104 授权
+
+<br />
+
+## 2026-09-08 ｜ 后端业务落地 + 前后端对齐 + 建库实测
+
+- **构建数据库**：实际执行 `build_db.sh -u root -p <密码> --seed`，库 `dalian_tutor` 5 表 + 种子（1 管理员 / 3 老师 / 3 学生）构建成功
+- **后端业务**（`back_end/`，Spring Boot 3.5.16 + MyBatis 3.0.5 + MySQL，包 `com.daliantutor`）：
+  - 登录 `POST /api/auth/login`（phone+password+role），HMAC 令牌鉴权（拦截器 + CORS，`/api/admin/**` 限管理员）
+  - 老师/学生入驻注册、列表、我的资料；双向选择（投递简历/指派 → `order` 表 status 0/1）；管理后台统计/列表/待审核请求
+  - `mvn compile` 通过（BUILD SUCCESS，JDK 21 + Maven 3.9.16）
+- **删除前端无法实现（数据库无法支撑）的业务**，使前后端对齐：
+  - 登录由 `username` 改为 `phone`（数据库无 username 字段）
+  - 删除学生「家长称呼 guardian」（student 表无此字段）
+  - 老师「可教年级」由位掩码多选改为单一数值 `grade`；学生年级由字符串改为数值编码（0~16）
+  - 新增 `GRADE_LEVELS` + `gradeLabel()`，移除 `encodeGrades/decodeGrades`；选择关系以 phone 为标识
+  - 门户「教员库」的 `Tutor` mock（评分/标签/授课方式等营销展示字段）保留，不接数据库
+- 分支：`feature/backend-service`，待联调验证后提 PR（不直推 main）
+- 提交人：Claw 助手 / zhang060104 授权

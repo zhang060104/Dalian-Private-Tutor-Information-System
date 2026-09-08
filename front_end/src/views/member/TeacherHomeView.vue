@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSystemStore } from '@/stores/system'
-import { decodeGrades, decodeSubjects, scheduleSummary } from '@/utils/availability'
+import { decodeSubjects, scheduleSummary } from '@/utils/availability'
+import { gradeLabel } from '@/data/tutors'
 import type { StudentAccount } from '@/types'
 
 /** 老师工作台：查看入驻资料 + 选择学生（学生也可反向选择老师，双向即匹配） */
@@ -10,23 +11,23 @@ import type { StudentAccount } from '@/types'
 const store = useSystemStore()
 
 const me = computed(() => (store.current?.role === 'teacher' ? store.current : null))
-const rels = computed(() => (me.value ? store.relationsOfTeacher(me.value.username) : []))
+const rels = computed(() => (me.value ? store.relationsOfTeacher(me.value.phone) : []))
 
 const mySubjects = computed(() => (me.value ? decodeSubjects(me.value.subjects) : []))
-const myGrades = computed(() => (me.value ? decodeGrades(me.value.grades) : []))
+const myGrade = computed(() => (me.value ? gradeLabel(me.value.grade) : ''))
 const myScheduleText = computed(() => {
   if (!me.value) return ''
   const busy = scheduleSummary(me.value.availability).filter((s) => !s.includes('无空闲'))
   return busy.length ? busy.join('；') : '未填写空余时间'
 })
 
-const chosenByMe = computed(() => new Set(rels.value.filter((r) => r.by === 'teacher').map((r) => r.studentUsername)))
-const chosenMe = computed(() => new Set(rels.value.filter((r) => r.by === 'student').map((r) => r.studentUsername)))
+const chosenByMe = computed(() => new Set(rels.value.filter((r) => r.by === 'teacher').map((r) => r.studentPhone)))
+const chosenMe = computed(() => new Set(rels.value.filter((r) => r.by === 'student').map((r) => r.studentPhone)))
 const matchedCount = computed(() => [...chosenByMe.value].filter((u) => chosenMe.value.has(u)).length)
 
 function stateOf(s: StudentAccount) {
-  const byMe = chosenByMe.value.has(s.username)
-  const byStudent = chosenMe.value.has(s.username)
+  const byMe = chosenByMe.value.has(s.phone)
+  const byStudent = chosenMe.value.has(s.phone)
   return { byMe, byStudent, mutual: byMe && byStudent }
 }
 
@@ -39,7 +40,7 @@ function scheduleText(availability?: number[]): string {
 
 function toggle(s: StudentAccount) {
   try {
-    store.toggleSelect(s.username, 'teacher')
+    store.toggleSelect(s.phone, 'teacher')
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -63,11 +64,11 @@ function toggle(s: StudentAccount) {
         <div>
           <h2 class="welcome-title">{{ me.name }}老师，欢迎回来 👋</h2>
           <p class="welcome-sub">
-            账号：{{ me.username }}
+            手机号：{{ me.phone }}
           </p>
           <p class="welcome-tags">
             <el-tag v-for="s in mySubjects" :key="s" size="small" effect="plain">{{ s }}</el-tag>
-            <el-tag v-for="g in myGrades" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
+            <el-tag v-if="myGrade" size="small" type="success" effect="plain">{{ myGrade }}</el-tag>
           </p>
           <p class="welcome-sched">空余时间：{{ myScheduleText }}</p>
         </div>
@@ -93,12 +94,12 @@ function toggle(s: StudentAccount) {
       </div>
 
       <div v-if="store.students.length" class="card-grid">
-        <article v-for="s in store.students" :key="s.username" class="person-card">
+        <article v-for="s in store.students" :key="s.phone" class="person-card">
           <header class="person-head">
             <div class="person-avatar">{{ s.name.slice(0, 1) }}</div>
             <div>
               <h4 class="person-name">{{ s.name }}<span class="person-role">学生</span></h4>
-              <p class="person-meta">{{ s.grade }} · {{ decodeSubjects(s.subjects).join('、') || '未选科目' }} · {{ s.guardian }}</p>
+              <p class="person-meta">{{ gradeLabel(s.grade) }} · {{ decodeSubjects(s.subjects).join('、') || '未选科目' }}</p>
               <p class="person-sched">空闲：{{ scheduleText(s.availability) }}</p>
             </div>
           </header>

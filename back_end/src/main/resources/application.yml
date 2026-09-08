@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: dalian-tutor-back
+  datasource:
+    # 密码一律通过环境变量 DB_PASSWORD 注入，禁止写进本文件/提交仓库
+    url: jdbc:mysql://localhost:3306/dalian_tutor?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.daliantutor.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+daliantutor:
+  # 登录令牌 HMAC 签名密钥（生产环境通过环境变量覆盖）
+  token-secret: ${TUTOR_TOKEN_SECRET:dalian-tutor-dev-secret-2026}
+  token-ttl-hours: 168
+
+logging:
+  level:
+    com.daliantutor: debug

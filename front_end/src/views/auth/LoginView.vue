@@ -17,29 +17,29 @@ const roleTabs: Array<{ role: PortalRole; label: string; sub: string; icon: stri
   { role: 'student', label: '学生登录', sub: '找家教 · 约课学习', icon: 'Reading' },
 ]
 
-/** 演示账号（前端演示模式，接入后端后移除） */
-const DEMO: Record<PortalRole, { username: string; password: string; tip: string }> = {
-  teacher: { username: 'teacher1', password: '123456', tip: '老师（张明 · 数学）' },
-  student: { username: 'student1', password: '123456', tip: '学生（王小雨 · 初二）' },
+/** 演示账号（前端演示模式，接入后端后移除），登录标识为手机号 */
+const DEMO: Record<PortalRole, { phone: string; password: string; tip: string }> = {
+  teacher: { phone: '13800000001', password: '123456', tip: '老师（王老师 · 数学/物理）' },
+  student: { phone: '13900000001', password: '123456', tip: '学生（同学甲 · 高一）' },
 }
 
 const activeRole = ref<PortalRole>('teacher')
-const form = reactive({ username: '', password: '' })
+const form = reactive({ phone: '', password: '' })
 const loading = ref(false)
 
 function fillDemo() {
-  form.username = DEMO[activeRole.value].username
+  form.phone = DEMO[activeRole.value].phone
   form.password = DEMO[activeRole.value].password
 }
 
 async function submit() {
-  if (!form.username.trim() || !form.password) {
-    ElMessage.warning('请输入用户名和密码')
+  if (!form.phone.trim() || !form.password) {
+    ElMessage.warning('请输入手机号和密码')
     return
   }
   loading.value = true
   try {
-    store.login(form.username, form.password, activeRole.value)
+    store.login(form.phone, form.password, activeRole.value)
     ElMessage.success('登录成功')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     router.replace(redirect.startsWith('/') ? redirect : ROLE_HOME[activeRole.value])
@@ -52,7 +52,7 @@ async function submit() {
 
 function switchRole(role: PortalRole) {
   activeRole.value = role
-  form.username = ''
+  form.phone = ''
   form.password = ''
 }
 </script>
@@ -125,10 +125,10 @@ function switchRole(role: PortalRole) {
         <el-form class="auth-form" size="large" @submit.prevent="submit">
           <el-form-item>
             <el-input
-              v-model="form.username"
-              placeholder="请输入用户名"
+              v-model="form.phone"
+              placeholder="请输入手机号"
               clearable
-              autocomplete="username"
+              autocomplete="tel"
               @keyup.enter="submit"
             >
               <template #prefix>

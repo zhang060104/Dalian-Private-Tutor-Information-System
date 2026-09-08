@@ -6,16 +6,18 @@ import type {
   StudentAccount,
   TeacherAccount,
 } from '@/types'
-import { encodeDay, encodeGrades, encodeSubjects } from '@/utils/availability'
+import { encodeDay, encodeSubjects } from '@/utils/availability'
 
 /**
  * 角色账号体系 Store（前端演示模式）
  *
  * ⚠️ 当前无后端：账号 / 资料 / 师生选择关系全部保存在浏览器 localStorage。
  * 后续接入后端后，本模块替换为 API 调用，组件层无需大改。
+ *
+ * 登录标识为 phone（数据库无 username 字段），老师/学生年级为单一数值编码。
  */
 
-const LS_DATA = 'tutor_system_v2' // v2：空余时间(7×int) + 科目/年级位掩码
+const LS_DATA = 'tutor_system_v3' // v3：phone 登录 + 年级单一数值 + 移除 guardian
 const LS_CURRENT = 'tutor_system_current'
 
 export const ROLE_HOME: Record<Role, string> = {
@@ -40,48 +42,48 @@ function weekdaysTemplate(weekend?: boolean): number[] {
 function seedData(): { users: AnyAccount[]; relations: MatchRelation[] } {
   const t = now()
   const users: AnyAccount[] = [
-    { username: 'admin', password: '123456', role: 'admin', name: '系统管理员', phone: '0411-8888-6666', createdAt: t },
+    { password: '123456', role: 'admin', name: 'admin', phone: '13800000000', createdAt: t },
     {
-      username: 'teacher1', password: '123456', role: 'teacher', name: '张明', gender: '男',
+      password: '123456', role: 'teacher', name: '王老师', gender: '女',
       phone: '13800000001', createdAt: t,
-      subjects: encodeSubjects(['数学']),
-      grades: encodeGrades(['初一', '初二', '初三']),
-      intro: '专注中考数学提分，耐心细致，带过 200+ 学生。',
+      subjects: encodeSubjects(['数学', '物理']),
+      grade: 10,
+      intro: '原重点中学数学骨干教师，擅长初高中数理培优。',
       availability: weekdaysTemplate(),
     },
     {
-      username: 'teacher2', password: '123456', role: 'teacher', name: '李婷', gender: '女',
+      password: '123456', role: 'teacher', name: '李老师', gender: '男',
       phone: '13800000002', createdAt: t,
       subjects: encodeSubjects(['英语']),
-      grades: encodeGrades(['小学', '初一', '初二']),
-      intro: '少儿英语启蒙与应试结合，课堂活泼。',
-      availability: [encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15])],
-    },
-    {
-      username: 'teacher3', password: '123456', role: 'teacher', name: '王强', gender: '男',
-      phone: '13800000003', createdAt: t,
-      subjects: encodeSubjects(['物理', '数学']),
-      grades: encodeGrades(['高一', '高二', '高三']),
-      intro: '高中物理竞赛辅导经验，擅长体系化教学。',
+      grade: 8,
+      intro: '高中英语提分专家，10 年毕业班经验。',
       availability: weekdaysTemplate(),
     },
     {
-      username: 'student1', password: '123456', role: 'student', name: '王小雨', gender: '女',
-      phone: '13900000001', createdAt: t, grade: '初二', subjects: encodeSubjects(['数学']),
-      guardian: '王先生（家长）', note: '希望周末上午上课',
-      availability: [encodeDay([]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17]), encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17])],
+      password: '123456', role: 'teacher', name: '张老师', gender: '女',
+      phone: '13800000003', createdAt: t,
+      subjects: encodeSubjects(['语文', '钢琴']),
+      grade: 4,
+      intro: '钢琴十级，兼顾小学语文阅读写作启蒙。',
+      availability: weekdaysTemplate(),
     },
     {
-      username: 'student2', password: '123456', role: 'student', name: '刘畅', gender: '男',
-      phone: '13900000002', createdAt: t, grade: '高一', subjects: encodeSubjects(['物理']),
-      guardian: '刘女士（家长）',
-      availability: [encodeDay([19, 20, 21]), encodeDay([19, 20, 21]), encodeDay([]), encodeDay([19, 20, 21]), encodeDay([19, 20, 21]), encodeDay([9, 10, 11, 12, 13, 14, 15]), encodeDay([])],
+      password: '123456', role: 'student', name: '同学甲', gender: '男',
+      phone: '13900000001', createdAt: t, grade: 10, subjects: encodeSubjects(['数学']),
+      note: '高一，数学基础薄弱，希望周末补课。',
+      availability: weekdaysTemplate(),
     },
     {
-      username: 'student3', password: '123456', role: 'student', name: '陈曦', gender: '女',
-      phone: '13900000003', createdAt: t, grade: '小学六年级', subjects: encodeSubjects(['英语']),
-      guardian: '陈先生（家长）', note: '基础薄弱，需耐心',
-      availability: weekdaysTemplate(false),
+      password: '123456', role: 'student', name: '同学乙', gender: '女',
+      phone: '13900000002', createdAt: t, grade: 8, subjects: encodeSubjects(['英语']),
+      note: '初二，英语口语与听力需加强。',
+      availability: weekdaysTemplate(),
+    },
+    {
+      password: '123456', role: 'student', name: '同学丙', gender: '男',
+      phone: '13900000003', createdAt: t, grade: 4, subjects: encodeSubjects(['语文', '数学']),
+      note: '小学四年级，语文数学作业辅导。',
+      availability: weekdaysTemplate(),
     },
   ]
   return { users, relations: [] }
@@ -144,8 +146,8 @@ export const useSystemStore = defineStore('system', {
 
     /** 老师入驻（含账号 + 个人信息） */
     registerTeacher(payload: Omit<TeacherAccount, 'role' | 'createdAt'>): TeacherAccount {
-      if (this.users.some((u) => u.username === payload.username)) {
-        throw new Error('该用户名已被注册，请更换')
+      if (this.users.some((u) => u.phone === payload.phone)) {
+        throw new Error('该手机号已被注册，请更换')
       }
       const account: TeacherAccount = { ...payload, role: 'teacher', createdAt: now() }
       this.users.push(account)
@@ -155,8 +157,8 @@ export const useSystemStore = defineStore('system', {
 
     /** 学生入驻（含账号 + 个人信息） */
     registerStudent(payload: Omit<StudentAccount, 'role' | 'createdAt'>): StudentAccount {
-      if (this.users.some((u) => u.username === payload.username)) {
-        throw new Error('该用户名已被注册，请更换')
+      if (this.users.some((u) => u.phone === payload.phone)) {
+        throw new Error('该手机号已被注册，请更换')
       }
       const account: StudentAccount = { ...payload, role: 'student', createdAt: now() }
       this.users.push(account)
@@ -164,11 +166,11 @@ export const useSystemStore = defineStore('system', {
       return account
     },
 
-    login(username: string, password: string, role: Role) {
+    login(phone: string, password: string, role: Role) {
       const user = this.users.find(
-        (u) => u.username === username.trim() && u.password === password && u.role === role,
+        (u) => u.phone === phone.trim() && u.password === password && u.role === role,
       )
-      if (!user) throw new Error('用户名或密码错误，请核对角色后重试')
+      if (!user) throw new Error('手机号或密码错误，请核对角色后重试')
       this.current = user
       saveCurrent(user)
       return user
@@ -180,46 +182,45 @@ export const useSystemStore = defineStore('system', {
     },
 
     /** 是否已存在同向选择（去重判断用） */
-    hasRelation(teacherUsername: string, studentUsername: string, by: 'teacher' | 'student'): boolean {
+    hasRelation(teacherPhone: string, studentPhone: string, by: 'teacher' | 'student'): boolean {
       return this.relations.some(
-        (r) => r.teacherUsername === teacherUsername && r.studentUsername === studentUsername && r.by === by,
+        (r) => r.teacherPhone === teacherPhone && r.studentPhone === studentPhone && r.by === by,
       )
     },
 
     /** 发起/取消一次选择：teacher=老师选学生；student=学生选老师 */
-    toggleSelect(targetUsername: string, role: 'teacher' | 'student') {
+    toggleSelect(targetPhone: string, role: 'teacher' | 'student') {
       const me = this.current
       if (!me) throw new Error('请先登录')
       if (role === 'teacher') {
         // 当前登录的是老师，目标为学生
         if (me.role !== 'teacher') throw new Error('仅老师可发起该操作')
-        const teacherUsername = me.username
-        const studentUsername = targetUsername
-        const existed = this.hasRelation(teacherUsername, studentUsername, 'teacher')
+        const teacherPhone = me.phone
+        const studentPhone = targetPhone
+        const existed = this.hasRelation(teacherPhone, studentPhone, 'teacher')
         this.relations = this.relations.filter(
-          (r) => !(r.teacherUsername === teacherUsername && r.studentUsername === studentUsername && r.by === 'teacher'),
+          (r) => !(r.teacherPhone === teacherPhone && r.studentPhone === studentPhone && r.by === 'teacher'),
         )
-        if (!existed) this.relations.push({ teacherUsername, studentUsername, by: 'teacher', createdAt: now() })
+        if (!existed) this.relations.push({ teacherPhone, studentPhone, by: 'teacher', createdAt: now() })
       } else {
         // 当前登录的是学生，目标为老师
         if (me.role !== 'student') throw new Error('仅学生可发起该操作')
-        const teacherUsername = targetUsername
-        const studentUsername = me.username
-        const existed = this.hasRelation(teacherUsername, studentUsername, 'student')
+        const teacherPhone = targetPhone
+        const studentPhone = me.phone
+        const existed = this.hasRelation(teacherPhone, studentPhone, 'student')
         this.relations = this.relations.filter(
-          (r) => !(r.teacherUsername === teacherUsername && r.studentUsername === studentUsername && r.by === 'student'),
+          (r) => !(r.teacherPhone === teacherPhone && r.studentPhone === studentPhone && r.by === 'student'),
         )
-        if (!existed) this.relations.push({ teacherUsername, studentUsername, by: 'student', createdAt: now() })
+        if (!existed) this.relations.push({ teacherPhone, studentPhone, by: 'student', createdAt: now() })
       }
       this.persist()
     },
 
-    /** 某老师被哪些学生选择 / 某学生被哪些老师选择等查询，由组件用 getters 计算 */
-    relationsOfTeacher(username: string) {
-      return this.relations.filter((r) => r.teacherUsername === username)
+    relationsOfTeacher(phone: string) {
+      return this.relations.filter((r) => r.teacherPhone === phone)
     },
-    relationsOfStudent(username: string) {
-      return this.relations.filter((r) => r.studentUsername === username)
+    relationsOfStudent(phone: string) {
+      return this.relations.filter((r) => r.studentPhone === phone)
     },
   },
 })
