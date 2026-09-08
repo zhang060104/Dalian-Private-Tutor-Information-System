@@ -41,10 +41,10 @@ export const CENTER_CONTACT = {
 /** 系统角色 */
 export type Role = 'admin' | 'teacher' | 'student'
 
-/** 账号基类 */
+/** 账号基类（登录标识为 phone，数据库无 username 字段） */
 export interface AccountBase {
-  username: string
-  password: string
+  id?: number
+  password?: string
   role: Role
   name: string
   phone: string
@@ -64,8 +64,8 @@ export interface TeacherAccount extends AccountBase {
   gender: '男' | '女'
   /** 主教科目：SUBJECT_OPTIONS 下标位掩码（bit i = SUBJECT_OPTIONS[i] 选中），由前端编解码 */
   subjects: number
-  /** 可教年级：GRADE_OPTIONS 下标位掩码（bit i = GRADE_OPTIONS[i] 选中） */
-  grades: number
+  /** 可授年级：单一数值编码（0幼儿园 1-6小学 7-9初中 10-12高中 13-16大学） */
+  grade: number
   intro: string
   /** 一周空余时间（7 个 int，见 WeekAvailability） */
   availability: WeekAvailability
@@ -75,10 +75,10 @@ export interface TeacherAccount extends AccountBase {
 export interface StudentAccount extends AccountBase {
   role: 'student'
   gender: '男' | '女'
-  grade: string
+  /** 年级：单一数值编码（0幼儿园 1-6小学 7-9初中 10-12高中 13-16大学） */
+  grade: number
   /** 需要辅导的科目：SUBJECT_OPTIONS 下标位掩码（单科即单 bit 置位） */
   subjects: number
-  guardian: string
   note?: string
   /** 一周空余时间（7 个 int，见 WeekAvailability） */
   availability: WeekAvailability
@@ -91,10 +91,10 @@ export interface AdminAccount extends AccountBase {
 
 export type AnyAccount = AdminAccount | TeacherAccount | StudentAccount
 
-/** 师生双向选择关系（老师选学生 / 学生选老师） */
+/** 师生双向选择关系（老师选学生 / 学生选老师），以 phone 作为唯一标识 */
 export interface MatchRelation {
-  teacherUsername: string
-  studentUsername: string
+  teacherPhone: string
+  studentPhone: string
   /** 发起方：teacher=老师选择了学生；student=学生选择了老师 */
   by: 'teacher' | 'student'
   createdAt: string
@@ -119,14 +119,13 @@ export interface ProfileReviewField {
  * 通过后由管理员将 next 合并进对应用户；驳回/撤销则直接移除本条申请。
  */
 export interface ProfileReview {
-  id: string
-  username: string
+  id: number
+  /** 申请人登录标识（手机号），数据库无 username 字段 */
+  phone: string
   role: 'teacher' | 'student'
   /** 提交人姓名（提交时快照，便于后台展示） */
   name: string
   submittedAt: string
-  /** 申请的新资料（含位掩码编码后的字段；approve 时合并到用户） */
-  next: Partial<TeacherAccount> | Partial<StudentAccount>
   /** 字段级变更清单（只含有变化的字段） */
   fields: ProfileReviewField[]
 }

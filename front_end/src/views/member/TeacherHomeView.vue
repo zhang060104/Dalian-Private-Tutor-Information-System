@@ -1,128 +1,39 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSystemStore } from '@/stores/system'
 import ScheduleEditor from '@/components/ScheduleEditor.vue'
-import { GRADE_OPTIONS, SUBJECT_OPTIONS } from '@/data/tutors'
-import { decodeGrades, decodeSubjects, encodeGrades, encodeSubjects, scheduleSummary } from '@/utils/availability'
-import type { ProfileReviewField, StudentAccount, TeacherAccount } from '@/types'
+import { GRADE_LEVELS, SUBJECT_OPTIONS, gradeLabel } from '@/data/tutors'
+import { decodeSubjects, encodeSubjects, scheduleSummary } from '@/utils/availability'
+import type { ProfileReviewField, StudentAccount } from '@/types'
 
-/** 老师工作台：查看入驻资料 + 选择学生；资料修改需管理员审核（审核期间沿用当前资料） */
+/** 老师工作台：查看入驻资料 + 选择学生；资料修改需管理员审核 */
 
 const store = useSystemStore()
 
+onMounted(() => {
+  store.loadAll().catch(() => {})
+  store.loadMyReview().catch(() => {})
+})
+
 const me = computed(() => (store.current?.role === 'teacher' ? store.current : null))
-const rels = computed(() => (me.value ? store.relationsOfTeacher(me.value.username) : []))
+const rels = computed(() => (me.value ? store.relationsOfTeacher(me.value.phone) : []))
 
 const mySubjects = computed(() => (me.value ? decodeSubjects(me.value.subjects) : []))
-const myGrades = computed(() => (me.value ? decodeGrades(me.value.grades) : []))
+const myGrade = computed(() => (me.value ? gradeLabel(me.value.grade) : ''))
 const myScheduleText = computed(() => {
   if (!me.value) return ''
   const busy = scheduleSummary(me.value.availability).filter((s) => !s.includes('无空闲'))
   return busy.length ? busy.join('；') : '未填写空余时间'
 })
 
-const chosenByMe = computed(() => new Set(rels.value.filter((r) => r.by === 'teacher').map((r) => r.studentUsername)))
-const chosenMe = computed(() => new Set(rels.value.filter((r) => r.by === 'student').map((r) => r.studentUsername)))
+const chosenByMe = computed(() => new Set(rels.value.filter((r) => r.by === 'teacher').map((r) => r.studentPhone)))
+const chosenMe = computed(() => new Set(rels.value.filter((r) => r.by === 'student').map((r) => r.studentPhone)))
 const matchedCount = computed(() => [...chosenByMe.value].filter((u) => chosenMe.value.has(u)).length)
 
-/* ---------------- 个人资料展示 / 修改（管理员审核制） ---------------- */
-
-const pending = computed(() => (me.value ? store.pendingReviewOf(me.value.username) : undefined))
-
-function fmtSched(availability?: number[]): string {
-  const busy = scheduleSummary(availability).filter((s) => !s.includes('无空闲'))
-  return busy.length ? busy.join('；') : '未填写'
-}
-
-const editVisible = ref(false)
-const submitting = ref(false)
-const form = reactive({
-  name: '',
-  gender: '男' as '男' | '女',
-  phone: '',
-  subjects: [] as string[],
-  grades: [] as string[],
-  intro: '',
-  availability: [] as number[],
-})
-
-function openEdit() {
-  if (!me.value) return
-  form.name = me.value.name
-  form.gender = me.value.gender
-  form.phone = me.value.phone
-  form.subjects = [...decodeSubjects(me.value.subjects)]
-  form.grades = [...decodeGrades(me.value.grades)]
-  form.intro = me.value.intro
-  form.availability = [...me.value.availability]
-  editVisible.value = true
-}
-
-function submitEdit() {
-  if (!me.value) return
-  if (!form.name.trim()) return ElMessage.warning('请填写姓名')
-  if (!form.phone.trim()) return ElMessage.warning('请填写联系电话')
-  if (!form.subjects.length) return ElMessage.warning('请至少选择一个主教科目')
-  if (!form.grades.length) return ElMessage.warning('请至少选择一个可教年级')
-  if (!form.intro.trim()) return ElMessage.warning('请填写个人简介')
-
-  const old = me.value
-  const next: Partial<TeacherAccount> = {
-    name: form.name.trim(),
-    gender: form.gender,
-    phone: form.phone.trim(),
-    subjects: encodeSubjects(form.subjects),
-    grades: encodeGrades(form.grades),
-    intro: form.intro.trim(),
-    availability: [...form.availability],
-  }
-  const fields: ProfileReviewField[] = []
-  const push = (label: string, o: string, n: string) => {
-    if (o !== n) fields.push({ label, old: o || '未填写', next: n || '未填写' })
-  }
-  push('姓名', old.name, next.name ?? '')
-  push('性别', old.gender, next.gender ?? '')
-  push('联系电话', old.phone, next.phone ?? '')
-  push('主教科目', decodeSubjects(old.subjects).join('、'), decodeSubjects(next.subjects ?? 0).join('、'))
-  push('可教年级', decodeGrades(old.grades).join('、'), decodeGrades(next.grades ?? 0).join('、'))
-  push('个人简介', old.intro, next.intro ?? '')
-  push('空余时间', fmtSched(old.availability), fmtSched(next.availability))
-  if (!fields.length) {
-    ElMessage.info('资料没有任何改动')
-    return
-  }
-  submitting.value = true
-  try {
-    store.submitProfileReview(me.value.username, 'teacher', next.name!, next, fields)
-    ElMessage.success('修改申请已提交，等待管理员审核')
-    editVisible.value = false
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function cancelPending() {
-  const review = pending.value
-  if (!review) return
-  try {
-    await ElMessageBox.confirm('确定撤销这份资料修改申请吗？撤销后需重新填写提交。', '撤销申请', {
-      type: 'warning',
-      confirmButtonText: '撤销申请',
-      cancelButtonText: '再想想',
-    })
-    store.cancelProfileReview(review.id)
-    ElMessage.success('已撤销申请')
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.error((e as Error).message)
-  }
-}
-
 function stateOf(s: StudentAccount) {
-  const byMe = chosenByMe.value.has(s.username)
-  const byStudent = chosenMe.value.has(s.username)
+  const byMe = chosenByMe.value.has(s.phone)
+  const byStudent = chosenMe.value.has(s.phone)
   return { byMe, byStudent, mutual: byMe && byStudent }
 }
 
@@ -135,7 +46,100 @@ function scheduleText(availability?: number[]): string {
 
 function toggle(s: StudentAccount) {
   try {
-    store.toggleSelect(s.username, 'teacher')
+    store.toggleSelect(s.phone, 'teacher')
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}
+
+/* ---------------- 个人资料展示 / 修改（管理员审核制） ---------------- */
+
+const pending = computed(() => (me.value ? store.myReview : null))
+
+function fmtTime(iso: string): string {
+  return iso ? new Date(iso).toLocaleString('zh-CN') : ''
+}
+
+const editVisible = ref(false)
+const submitting = ref(false)
+const form = reactive({
+  name: '',
+  gender: '男' as '男' | '女',
+  grade: 0,
+  subjects: [] as string[],
+  intro: '',
+  availability: [] as number[],
+})
+
+function openEdit() {
+  if (!me.value) return
+  form.name = me.value.name
+  form.gender = me.value.gender
+  form.grade = me.value.grade
+  form.subjects = decodeSubjects(me.value.subjects)
+  form.intro = me.value.intro
+  form.availability = [...me.value.availability]
+  editVisible.value = true
+}
+
+async function submitEdit() {
+  if (!me.value) return
+  if (!form.name.trim()) return ElMessage.warning('请填写姓名')
+  if (!form.subjects.length) return ElMessage.warning('请至少选择一个主教科目')
+
+  const nextSubjects = encodeSubjects(form.subjects)
+  const fields: ProfileReviewField[] = []
+  const push = (label: string, o: string, n: string) => {
+    if (o !== n) fields.push({ label, old: o || '未填写', next: n || '未填写' })
+  }
+  push('姓名', me.value.name, form.name.trim())
+  push('性别', me.value.gender, form.gender)
+  push('可授年级', gradeLabel(me.value.grade), gradeLabel(form.grade))
+  push('主教科目', decodeSubjects(me.value.subjects).join('、'), decodeSubjects(nextSubjects).join('、'))
+  push('个人简介', me.value.intro, form.intro.trim())
+  push('空余时间', scheduleText(me.value.availability), scheduleText(form.availability))
+  if (!fields.length) {
+    ElMessage.info('资料没有任何改动')
+    return
+  }
+
+  const profile: Record<string, unknown> = {
+    nickname: form.name.trim(),
+    gender: form.gender,
+    grade: form.grade,
+    subject: nextSubjects,
+    description: form.intro.trim(),
+  }
+  form.availability.forEach((v, i) => {
+    profile[`timeTable${i + 1}`] = v
+  })
+
+  submitting.value = true
+  try {
+    await store.submitProfileReview(profile, fields)
+    ElMessage.success('修改申请已提交，等待管理员审核')
+    editVisible.value = false
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function cancelPending() {
+  if (!pending.value) return
+  try {
+    await ElMessageBox.confirm('确定撤销这份资料修改申请吗？撤销后需重新填写提交。', '撤销申请', {
+      type: 'warning',
+      confirmButtonText: '撤销申请',
+      cancelButtonText: '再想想',
+    })
+  } catch {
+    return
+  }
+  try {
+    await store.cancelMyReview()
+    ElMessage.success('已撤销申请')
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -159,11 +163,11 @@ function toggle(s: StudentAccount) {
         <div>
           <h2 class="welcome-title">{{ me.name }}老师，欢迎回来 👋</h2>
           <p class="welcome-sub">
-            账号：{{ me.username }}
+            手机号：{{ me.phone }}
           </p>
           <p class="welcome-tags">
             <el-tag v-for="s in mySubjects" :key="s" size="small" effect="plain">{{ s }}</el-tag>
-            <el-tag v-for="g in myGrades" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
+            <el-tag v-if="myGrade" size="small" type="success" effect="plain">{{ myGrade }}</el-tag>
           </p>
           <p class="welcome-sched">空余时间：{{ myScheduleText }}</p>
         </div>
@@ -182,7 +186,7 @@ function toggle(s: StudentAccount) {
     </section>
 
     <!-- 我的资料（对外展示；修改需管理员审核） -->
-    <section class="section profile-section">
+    <section v-if="me" class="section">
       <div class="section-head">
         <h3 class="section-title">我的资料</h3>
         <p class="section-desc">
@@ -193,7 +197,7 @@ function toggle(s: StudentAccount) {
       <el-alert
         v-if="pending"
         class="pending-tip"
-        :title="`资料修改申请审核中（提交于 ${new Date(pending.submittedAt).toLocaleString('zh-CN')}），通过后新资料才会生效。`"
+        :title="`资料修改申请审核中（提交于 ${fmtTime(pending.submittedAt)}），通过后新资料才会生效。`"
         type="warning"
         :closable="false"
         show-icon
@@ -202,21 +206,13 @@ function toggle(s: StudentAccount) {
       </el-alert>
 
       <el-descriptions :column="2" border class="profile-desc">
-        <el-descriptions-item label="姓名">{{ me?.name }}</el-descriptions-item>
-        <el-descriptions-item label="性别">{{ me?.gender }}</el-descriptions-item>
-        <el-descriptions-item label="账号">{{ me?.username }}</el-descriptions-item>
-        <el-descriptions-item label="联系电话">{{ me?.phone }}</el-descriptions-item>
-        <el-descriptions-item label="主教科目">
-          {{ mySubjects.join('、') || '未选' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="可教年级">
-          {{ myGrades.join('、') || '未选' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="个人简介" :span="2">{{ me?.intro || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="入驻时间">
-          {{ me ? new Date(me.createdAt).toLocaleDateString('zh-CN') : '' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="我的空余时间">{{ myScheduleText }}</el-descriptions-item>
+        <el-descriptions-item label="姓名">{{ me.name }}</el-descriptions-item>
+        <el-descriptions-item label="性别">{{ me.gender }}</el-descriptions-item>
+        <el-descriptions-item label="手机号">{{ me.phone }}</el-descriptions-item>
+        <el-descriptions-item label="可授年级">{{ myGrade }}</el-descriptions-item>
+        <el-descriptions-item label="主教科目">{{ mySubjects.join('、') || '未选' }}</el-descriptions-item>
+        <el-descriptions-item label="个人简介">{{ me.intro || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="我的空余时间" :span="2">{{ myScheduleText }}</el-descriptions-item>
       </el-descriptions>
 
       <div class="section-actions">
@@ -234,12 +230,12 @@ function toggle(s: StudentAccount) {
       </div>
 
       <div v-if="store.students.length" class="card-grid">
-        <article v-for="s in store.students" :key="s.username" class="person-card">
+        <article v-for="s in store.students" :key="s.phone" class="person-card">
           <header class="person-head">
             <div class="person-avatar">{{ s.name.slice(0, 1) }}</div>
             <div>
               <h4 class="person-name">{{ s.name }}<span class="person-role">学生</span></h4>
-              <p class="person-meta">{{ s.grade }} · {{ decodeSubjects(s.subjects).join('、') || '未选科目' }} · {{ s.guardian }}</p>
+              <p class="person-meta">{{ gradeLabel(s.grade) }} · {{ decodeSubjects(s.subjects).join('、') || '未选科目' }}</p>
               <p class="person-sched">空闲：{{ scheduleText(s.availability) }}</p>
             </div>
           </header>
@@ -269,7 +265,7 @@ function toggle(s: StudentAccount) {
   </div>
 
   <!-- 修改资料对话框 -->
-  <el-dialog v-model="editVisible" title="修改个人资料" width="720px" top="6vh" :close-on-click-modal="false">
+  <el-dialog v-model="editVisible" title="修改个人资料" width="680px" top="6vh" :close-on-click-modal="false">
     <el-form label-width="96px" class="edit-form">
       <el-form-item label="姓名">
         <el-input v-model="form.name" placeholder="真实姓名" maxlength="20" />
@@ -280,25 +276,29 @@ function toggle(s: StudentAccount) {
           <el-radio-button value="女">女</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item label="联系电话">
-        <el-input v-model="form.phone" placeholder="手机号 / 座机" maxlength="20" />
+      <el-form-item label="可授年级">
+        <el-select v-model="form.grade" placeholder="选择年级" style="width: 240px">
+          <el-option v-for="g in GRADE_LEVELS" :key="g.value" :label="g.label" :value="g.value" />
+        </el-select>
       </el-form-item>
       <el-form-item label="主教科目">
-        <el-checkbox-group v-model="form.subjects">
-          <el-checkbox v-for="s in SUBJECT_OPTIONS" :key="s" :value="s" border>{{ s }}</el-checkbox>
-        </el-checkbox-group>
-      </el-form-item>
-      <el-form-item label="可教年级">
-        <el-checkbox-group v-model="form.grades">
-          <el-checkbox v-for="g in GRADE_OPTIONS" :key="g" :value="g" border>{{ g }}</el-checkbox>
-        </el-checkbox-group>
+        <el-select
+          v-model="form.subjects"
+          multiple
+          collapse-tags
+          collapse-tags-tooltip
+          placeholder="可多选"
+          style="width: 420px"
+        >
+          <el-option v-for="s in SUBJECT_OPTIONS" :key="s" :label="s" :value="s" />
+        </el-select>
       </el-form-item>
       <el-form-item label="个人简介">
         <el-input
           v-model="form.intro"
           type="textarea"
           :rows="3"
-          placeholder="教学经验、擅长方向、教学风格等（对外展示）"
+          placeholder="教学经历、擅长领域等（选填）"
           maxlength="200"
           show-word-limit
         />
@@ -544,38 +544,23 @@ function toggle(s: StudentAccount) {
   flex-wrap: wrap;
 }
 
-/* ---------- 我的资料（审核制） ---------- */
-
-.profile-section {
-  margin-bottom: 20px;
-}
+/* ---------- 我的资料 ---------- */
 
 .pending-tip {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .profile-desc {
-  font-size: 13px;
+  background: var(--bg-primary, #fff);
 }
 
 .section-actions {
   margin-top: 18px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.edit-form {
-  max-height: 62vh;
-  overflow-y: auto;
-  padding-right: 6px;
 }
 
 .edit-tip {
+  margin-top: 4px;
   font-size: 12.5px;
-  color: var(--text-tertiary);
-  background: var(--bg-subtle);
-  border-radius: 8px;
-  padding: 8px 12px;
-  line-height: 1.6;
+  color: var(--text-secondary);
 }
 </style>

@@ -45,9 +45,61 @@
 - ⚠️ localStorage 已有旧账号数据的浏览器需清缓存/重新播种（键 `tutor_system_v2`），否则旧数据仍带这三字段
 - `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
 
-## 2026-09-08 · 师生个人资料展示与修改（管理员审核制）
+## 2026-09-08 ｜ 删除数据库无法支撑的业务 + 对齐后端（phone 登录 / 年级数值编码）
+- 登录标识由 `username` 改为 `phone`：`AccountBase` 移除 username，登录/入驻/管理后台表单统一用手机号；演示账号对齐数据库种子（老师 13800000001~3、学生 13900000001~3、管理员 13800000000，密码 123456）
+- 删除学生「家长称呼 guardian」字段：类型、入驻表单、学生空间、管理后台表格同步移除
+- 年级改**单一数值编码**：老师「可教年级」由位掩码多选改为单选 `grade:number`；学生年级由字符串改为数值 `grade:number`
+- `data/tutors.ts` 新增 `GRADE_LEVELS`（0幼儿园/1~6小学/7~9初中/10~12高中/13~16大学，17 项）+ `gradeLabel()`；`utils/availability.ts` 移除 `encodeGrades/decodeGrades`
+- `MatchRelation` 由 username 标识改为 phone；`stores/system.ts` localStorage 键升级 `tutor_system_v3`
+- ⚠️ 门户「教员库」`Tutor` mock 类型（评分/标签/授课方式等营销展示字段）保留原样，不接数据库
+- ⚠️ 旧 localStorage（v2）账号数据需清缓存/重新播种
+- 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 前端接入后端 API（告别 localStorage 演示）
+- 新增 `src/api/http.ts`（axios 实例：请求自动带 Bearer 令牌、响应统一解包 `{code,message,data}` 并弹错）、`src/api/index.ts`（登录/注册/列表/双向选择/管理端接口封装）
+- `stores/system.ts` 由 localStorage 演示改为后端 API：登录/注册/列表/选择关系全部走 `/api/*`；令牌存 `localStorage[tutor_token]`，当前登录人缓存 `tutor_system_current` 供路由守卫
+- 工作台/学生空间/管理后台 `onMounted` 调 `loadAll`（刷新页面后自动拉取）；管理后台改用 `/api/admin/*` 接口加载全局数据
+- 后端实体（nickname/subject/description/timeTable1~7）在前端 store 层映射为前端类型（name/subjects/intro/availability）
+- `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
+
+## 2026-09-08 ｜ 合并 main 进 feature/backend-service：学生空间保留「老师列表已下线」
+- 冲突文件：`src/views/member/StudentHomeView.vue` —— main（PR #8）移除老师列表区块，后端分支重新引入并接入 API
+- 解决结论：**保留 main 的删除**。学生页面内嵌老师选择列表业务上不成立（学生不该反过来挑选老师），选择动作由老师侧发起；学生端仅展示自己的资料 + 匹配关系统计
+- 后端分支的必要改动全部保留：`onMounted → store.loadAll()`、登录标识 `username → phone`、`r.teacherUsername → r.teacherPhone`、年级展示 `{{ me.grade }} → {{ gradeLabel(me.grade) }}`、移除 `guardian` 展示
+- 同步删除仅服务老师列表的死代码：import（`ElMessage` / `TeacherAccount`）、helper（`teacherScheduleText` / `stateOf` / `toggle`）及卡片样式
+- 依赖补齐：`npm install` 安装 axios（`src/api/http.ts` 依赖，此前未安装导致 type-check 报 TS2307）
+- `npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）
+
+## 2026-09-08 ｜ 合并 main（PR #10 资料审核）：冲突全取后端分支，PR #10 实现弃用待重做
+- main 在 PR #9 开发期间又合入 PR #10（师生个人资料展示与修改 + 管理员审核制），冲突由 1 个文件扩大到 5 个文件 / 9 处
+- 冲突文件：`DEVLOG.md`、`stores/system.ts`(4 处)、`views/admin/AdminHomeView.vue`(2 处)、`views/member/StudentHomeView.vue`、`views/member/TeacherHomeView.vue`
+- **根因不是文本冲突而是架构对撞**：PR #10 基于旧 store（审核队列存本地缓存、`username` 标识），PR #9 已把 store 整个换成调后端 API（`phone` 标识 + Bearer 令牌，本地只存 token）
+- 解决结论：**冲突全部采用后端分支版本**，PR #10 的前端实现整段弃用（保留其 `ProfileReview` / `ProfileReviewField` 类型定义，由 `types/index.ts` 自动合并带入），功能在 API 版上重做
+- ⚠️ 弃用原因：让 PR #10 作者在本地缓存版上改会越改越乱，不如在已接入后端的 store 上重新实现一遍
+
+## 2026-09-08 · 师生个人资料展示与修改（管理员审核制）【PR #10 原始实现 · 已废弃】
+> ⚠️ 本条为 PR #10 的**原始实现记录**，基于本地缓存 + `username` 标识。
+> 与 feature/backend-service（PR #9）的 API 版 store 架构冲突，合并 main 时**整段实现被弃用**，
+> 功能已在 API 版上重做。此处按 DEVLOG「只增不删」规范保留原记录备查。
+
 - 学生/老师面板新增「我的资料」完整展示区（el-descriptions）+「修改资料」弹窗（姓名/性别/联系电话/年级/辅导科目/家长或简介/空余时间，空余时间复用 ScheduleEditor 位图编辑）
-- 修改提交后进入待审核队列：localStorage 数据新增 reviews 字段（兼容旧数据自动补空）；审核通过前对外仍展示旧资料；同一用户仅允许一条待审申请，本人可随时撤销
+- 修改提交后进入待审核队列：本地数据新增 reviews 字段（兼容旧数据自动补空）；审核通过前对外仍展示旧资料；同一用户仅允许一条待审申请，本人可随时撤销
 - 管理后台新增「资料审核」Tab（含待审统计卡）：字段级新旧对比（旧值红色删除线 → 新值绿色），支持通过（合并生效）/驳回（保留原资料）
 - types 新增 ProfileReview/ProfileReviewField；store 新增 submitProfileReview / approveProfileReview / rejectProfileReview / cancelProfileReview / pendingReviewOf；登录态与 users 实时资料自动同步
 - npm run type-check / build 通过（Claw 提交 / zhang060104 授权）
+
+## 2026-09-08 ｜ 资料修改审核在 API 版上重做（替代 PR #10 的本地缓存实现）
+后端：
+- 新增 `service/ProfileReviewService` + `controller/ProfileController` + 三个 DTO（`ProfileReviewSubmit` / `ProfileReviewVO` / `ProfileFieldDiff`）
+- 接口：`GET /api/profile/review/mine`（我的待审）、`POST /api/profile/review`（提交）、`POST /api/profile/review/{id}/cancel`（撤销）、`GET /api/admin/reviews`（待审列表）、`POST /api/admin/requests/{id}/resolve?approve=true|false`
+- 存储复用 `requestLog`：type 0=教师信息修改 / 1=学生信息修改，`json` 存 `{name, fields, profile, submittedAt}`，`tarID` 指向师生 id
+- ⚠️ 关键实现：审核通过时用 Jackson `readerForUpdating` 把 profile **合并进库里已有实体**再调 `updateProfile`，只覆盖提交的字段；否则未传字段（如 `age`）会被 SQL 置空
+- `RequestLogMapper` 新增 `findByTypeAndTarId`：同一用户只允许一条待审申请，提交前查重
+
+前端：
+- `types`：`ProfileReview` 的 `username` → `phone`（数据库无 username），`id` 改 number，去掉 `next`（新资料由后端 profile 承载）
+- `stores/system.ts`：新增 `myReview` / `reviews` 两个状态与 `loadMyReview` / `submitProfileReview` / `cancelMyReview` / `loadReviews` / `resolveReview`
+- 学生 / 老师面板：新增「我的资料」展示区（`el-descriptions`）+ 修改弹窗（年级用 `GRADE_LEVELS` 数值、科目走位掩码、空余时间复用 `ScheduleEditor`）+ 待审提示与撤销
+- 管理后台：新增「资料审核」Tab（含待审统计卡）+ 字段级新旧对比弹窗（旧值删除线 → 新值绿色），支持通过（新资料立即生效）/ 驳回
+- 与 PR #10 的差异：数据源由本地缓存改为后端 API；学生去掉 `guardian`（数据库无该字段）；联系电话不可改（`updateProfile` 不含 phone）
+- `mvn compile` BUILD SUCCESS；`npm run type-check` 通过（提交人：Claw 助手 / zhang060104 授权）

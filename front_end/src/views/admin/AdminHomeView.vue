@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { SwitchButton } from '@element-plus/icons-vue'
 import { useSystemStore } from '@/stores/system'
-import { decodeGrades, decodeSubjects, scheduleSummary } from '@/utils/availability'
+import { decodeSubjects, scheduleSummary } from '@/utils/availability'
+import { gradeLabel } from '@/data/tutors'
+import * as api from '@/api'
+import type { TeacherDto, StudentDto, OrderDto } from '@/api'
 import type { ProfileReview } from '@/types'
 
 /**
@@ -12,14 +15,51 @@ import type { ProfileReview } from '@/types'
  *
  * 约定：门户页面不设置任何跳转入口，本页也不放置任何站内导航/跳转按钮，
  * 仅保留右上角「退出登录」这一功能性操作。管理员直接访问 /admin 进入。
+ * 数据来源：/api/admin/* 后端接口。
  */
 
 const store = useSystemStore()
 const router = useRouter()
 
-const teachers = computed(() => store.teachers)
-const students = computed(() => store.students)
+const teachers = ref<Array<Record<string, unknown>>>([])
+const students = ref<Array<Record<string, unknown>>>([])
+const adminOrders = ref<OrderDto[]>([])
 const adminName = computed(() => (store.current?.role === 'admin' ? store.current.name : '管理员'))
+
+function teacherView(dto: TeacherDto) {
+  return {
+    name: dto.nickname,
+    gender: dto.gender,
+    phone: dto.phone,
+    subjects: dto.subject ?? 0,
+    grade: dto.grade ?? 0,
+    availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
+  }
+}
+
+function studentView(dto: StudentDto) {
+  return {
+    name: dto.nickname,
+    gender: dto.gender,
+    phone: dto.phone,
+    subjects: dto.subject ?? 0,
+    grade: dto.grade ?? 0,
+    note: dto.description || undefined,
+    availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
+  }
+}
+
+async function loadAdminData() {
+  const [t, s, o] = await Promise.all([api.adminTeachers(), api.adminStudents(), api.adminOrders()])
+  teachers.value = t.map(teacherView)
+  students.value = s.map(studentView)
+  adminOrders.value = o
+  await store.loadReviews()
+}
+
+onMounted(() => {
+  loadAdminData().catch(() => {})
+})
 
 /* ---------------- 个人资料修改审核 ---------------- */
 
@@ -36,50 +76,35 @@ function openDetail(r: ProfileReview) {
 }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN')
+  return iso ? new Date(iso).toLocaleString('zh-CN') : ''
 }
 
 function fieldLabels(r: ProfileReview): string {
   return r.fields.map((f) => f.label).join('、')
 }
 
-async function approveReview(r: ProfileReview) {
+async function resolveReview(r: ProfileReview, approve: boolean) {
   try {
     await ElMessageBox.confirm(
-      `确认通过「${r.name}（${r.username}）」的资料修改？新资料将立即生效并对外展示。`,
-      '通过审核',
-      { type: 'warning', confirmButtonText: '通过并生效', cancelButtonText: '再想想' },
+      approve
+        ? `确认通过「${r.name}（${r.phone}）」的资料修改？新资料将立即生效并对外展示。`
+        : `确认驳回「${r.name}（${r.phone}）」的资料修改？将保留其当前资料，申请人需重新提交。`,
+      approve ? '通过审核' : '驳回申请',
+      {
+        type: 'warning',
+        confirmButtonText: approve ? '通过并生效' : '确认驳回',
+        cancelButtonText: '再想想',
+      },
     )
   } catch {
     return
   }
   reviewBusy.value = true
   try {
-    store.approveProfileReview(r.id)
-    ElMessage.success('已通过，新资料已生效')
+    await store.resolveReview(r.id, approve)
+    ElMessage.success(approve ? '已通过，新资料已生效' : '已驳回，原资料保持不变')
     detailVisible.value = false
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    reviewBusy.value = false
-  }
-}
-
-async function rejectReview(r: ProfileReview) {
-  try {
-    await ElMessageBox.confirm(
-      `确认驳回「${r.name}（${r.username}）」的资料修改？将保留其当前资料，申请人需重新提交。`,
-      '驳回申请',
-      { type: 'warning', confirmButtonText: '确认驳回', cancelButtonText: '再想想' },
-    )
-  } catch {
-    return
-  }
-  reviewBusy.value = true
-  try {
-    store.rejectProfileReview(r.id)
-    ElMessage.success('已驳回，原资料保持不变')
-    detailVisible.value = false
+    if (approve) await loadAdminData()
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
@@ -99,21 +124,18 @@ interface PairView {
 /** 汇总师生匹配关系（按 老师×学生 归并双向选择） */
 const pairs = computed<PairView[]>(() => {
   const map = new Map<string, PairView>()
-  for (const r of store.relations) {
-    const teacher = store.users.find((u) => u.username === r.teacherUsername)
-    const student = store.users.find((u) => u.username === r.studentUsername)
-    if (!teacher || !student) continue
-    const key = `${r.teacherUsername}|${r.studentUsername}`
+  for (const o of adminOrders.value) {
+    const key = `${o.teacherId}|${o.studentId}`
     const existed = map.get(key)
     const base = existed ?? {
-      teacherName: teacher.name,
-      studentName: student.name,
+      teacherName: o.teacherName ?? `老师${o.teacherId}`,
+      studentName: o.studentName ?? `学生${o.studentId}`,
       teacherWant: false,
       studentWant: false,
       status: 'teacher-only' as PairView['status'],
-      updatedAt: r.createdAt,
+      updatedAt: o.createdAt ?? '',
     }
-    if (r.by === 'teacher') base.teacherWant = true
+    if (o.status === 0) base.teacherWant = true
     else base.studentWant = true
     base.status = base.teacherWant && base.studentWant ? 'matched' : base.teacherWant ? 'teacher-only' : 'student-only'
     if (!existed) map.set(key, base)
@@ -139,7 +161,6 @@ function schedCompact(availability?: number[]): string {
 function logout() {
   store.logout()
   ElMessage.success('已退出登录')
-  // 留在 /admin：退出后原地展示管理员登录卡（公共登录页不设管理员入口）
   router.replace('/admin')
 }
 
@@ -147,20 +168,21 @@ function logout() {
 const isAdmin = computed(() => store.current?.role === 'admin')
 
 /** 管理员登录（独立于公共登录页，仅地址栏直达 /admin 可进入） */
-const loginForm = reactive({ username: '', password: '' })
+const loginForm = reactive({ phone: '', password: '' })
 const loginLoading = ref(false)
 const loginError = ref('')
 
 async function adminLogin() {
   loginError.value = ''
-  if (!loginForm.username.trim() || !loginForm.password) {
-    loginError.value = '请输入管理员账号与密码'
+  if (!loginForm.phone.trim() || !loginForm.password) {
+    loginError.value = '请输入管理员手机号与密码'
     return
   }
   loginLoading.value = true
   try {
-    store.login(loginForm.username, loginForm.password, 'admin')
+    await store.login(loginForm.phone, loginForm.password, 'admin')
     ElMessage.success('管理员登录成功')
+    loadAdminData().catch(() => {})
   } catch (e) {
     loginError.value = (e as Error).message
   } finally {
@@ -217,7 +239,7 @@ async function adminLogin() {
 
       <el-alert
         class="admin-tip"
-        title="前端演示模式：数据保存在浏览器 localStorage；接入后端后替换为真实接口。"
+        title="数据已接入后端接口（/api/admin/*），展示为数据库真实数据。"
         type="info"
         :closable="false"
         show-icon
@@ -236,7 +258,7 @@ async function adminLogin() {
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="username" label="账号" width="120" />
+              <el-table-column prop="phone" label="手机号" width="130" />
               <el-table-column label="修改内容" min-width="220">
                 <template #default="{ row }">{{ fieldLabels(row) }}</template>
               </el-table-column>
@@ -248,13 +270,15 @@ async function adminLogin() {
                   <el-button link type="primary" @click="openDetail(row)">查看详情</el-button>
                 </template>
               </el-table-column>
+              <template #empty>
+                <el-empty description="暂无待审核的资料修改申请" :image-size="80" />
+              </template>
             </el-table>
-            <el-empty v-if="!reviews.length" description="暂无待审核的资料修改申请" :image-size="80" />
           </el-tab-pane>
 
           <el-tab-pane label="入驻老师">
             <el-table :data="teachers" stripe>
-              <el-table-column prop="username" label="账号" width="120" />
+              <el-table-column prop="phone" label="手机号" width="130" />
               <el-table-column label="姓名" width="120">
                 <template #default="{ row }">{{ row.name }}（{{ row.gender }}）</template>
               </el-table-column>
@@ -263,40 +287,33 @@ async function adminLogin() {
                   <el-tag v-for="s in decodeSubjects(row.subjects)" :key="s" size="small" effect="plain">{{ s }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="可教年级" min-width="150">
+              <el-table-column label="可授年级" min-width="120">
                 <template #default="{ row }">
-                  <el-tag v-for="g in decodeGrades(row.grades)" :key="g" size="small" type="success" effect="plain">{{ g }}</el-tag>
+                  <el-tag size="small" type="success" effect="plain">{{ gradeLabel(row.grade) }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
-              </el-table-column>
-              <el-table-column prop="phone" label="电话" width="130" />
-              <el-table-column prop="createdAt" label="入驻时间" width="170">
-                <template #default="{ row }">{{ new Date(row.createdAt).toLocaleString('zh-CN') }}</template>
               </el-table-column>
             </el-table>
           </el-tab-pane>
 
           <el-tab-pane label="入驻学生">
             <el-table :data="students" stripe>
-              <el-table-column prop="username" label="账号" width="120" />
+              <el-table-column prop="phone" label="手机号" width="130" />
               <el-table-column label="姓名" width="120">
                 <template #default="{ row }">{{ row.name }}（{{ row.gender }}）</template>
               </el-table-column>
-              <el-table-column prop="grade" label="年级" width="130" />
+              <el-table-column label="年级" width="130">
+                <template #default="{ row }">{{ gradeLabel(row.grade) }}</template>
+              </el-table-column>
               <el-table-column label="辅导科目" min-width="120">
                 <template #default="{ row }">{{ decodeSubjects(row.subjects).join('、') || '未选' }}</template>
               </el-table-column>
               <el-table-column label="一周空余时间" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">{{ schedCompact(row.availability) }}</template>
               </el-table-column>
-              <el-table-column prop="guardian" label="家长" width="140" />
-              <el-table-column prop="phone" label="电话" width="130" />
               <el-table-column prop="note" label="备注" min-width="160" />
-              <el-table-column prop="createdAt" label="入驻时间" width="170">
-                <template #default="{ row }">{{ new Date(row.createdAt).toLocaleString('zh-CN') }}</template>
-              </el-table-column>
             </el-table>
           </el-tab-pane>
 
@@ -333,12 +350,12 @@ async function adminLogin() {
         <p class="admin-login-sub">大连私人家教中心 · 内部管理入口</p>
 
         <el-form label-position="top" size="large" @submit.prevent="adminLogin">
-          <el-form-item label="管理员账号">
+          <el-form-item label="管理员手机号">
             <el-input
-              v-model="loginForm.username"
-              placeholder="请输入管理员账号"
+              v-model="loginForm.phone"
+              placeholder="请输入管理员手机号"
               clearable
-              autocomplete="username"
+              autocomplete="tel"
               @keyup.enter="adminLogin"
             />
           </el-form-item>
@@ -359,32 +376,36 @@ async function adminLogin() {
         </el-form>
       </div>
     </main>
-
-    <!-- 资料修改审核详情：旧值 → 新值 对比 -->
-    <el-dialog
-      v-model="detailVisible"
-      :title="detail ? `资料修改审核 · ${detail.name}（${detail.username}）` : ''"
-      width="560px"
-      top="8vh"
-      :close-on-click-modal="false"
-    >
-      <p v-if="detail" class="review-meta">
-        提交时间：{{ fmtTime(detail.submittedAt) }} · 审核通过前仍对外展示当前资料
-      </p>
-      <div v-if="detail" class="diff-list">
-        <div v-for="f in detail.fields" :key="f.label" class="diff-row">
-          <span class="diff-label">{{ f.label }}</span>
-          <span class="diff-old" :title="f.old">{{ f.old }}</span>
-          <span class="diff-arrow">→</span>
-          <span class="diff-new" :title="f.next">{{ f.next }}</span>
-        </div>
-      </div>
-      <template #footer>
-        <el-button type="danger" plain :loading="reviewBusy" @click="detail && rejectReview(detail)">驳 回</el-button>
-        <el-button type="primary" :loading="reviewBusy" @click="detail && approveReview(detail)">通过并生效</el-button>
-      </template>
-    </el-dialog>
   </div>
+
+  <!-- 资料修改审核详情：旧值 → 新值 对比 -->
+  <el-dialog
+    v-model="detailVisible"
+    :title="detail ? `资料修改审核 · ${detail.name}（${detail.phone}）` : ''"
+    width="560px"
+    top="8vh"
+    :close-on-click-modal="false"
+  >
+    <p v-if="detail" class="review-meta">
+      提交时间：{{ fmtTime(detail.submittedAt) }} · 审核通过前仍对外展示当前资料
+    </p>
+    <div v-if="detail" class="diff-list">
+      <div v-for="f in detail.fields" :key="f.label" class="diff-row">
+        <span class="diff-label">{{ f.label }}</span>
+        <span class="diff-old" :title="f.old">{{ f.old }}</span>
+        <span class="diff-arrow">→</span>
+        <span class="diff-new" :title="f.next">{{ f.next }}</span>
+      </div>
+    </div>
+    <template #footer>
+      <el-button type="danger" plain :loading="reviewBusy" @click="detail && resolveReview(detail, false)">
+        驳 回
+      </el-button>
+      <el-button type="primary" :loading="reviewBusy" @click="detail && resolveReview(detail, true)">
+        通过并生效
+      </el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -587,49 +608,46 @@ async function adminLogin() {
 
 .review-meta {
   font-size: 12.5px;
-  color: var(--text-tertiary);
-  margin-bottom: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
 }
 
 .diff-list {
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .diff-row {
   display: grid;
-  grid-template-columns: 72px 1fr 24px 1fr;
+  grid-template-columns: 88px 1fr 20px 1fr;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
   font-size: 13px;
 }
 
-.diff-row + .diff-row {
-  border-top: 1px solid var(--border-color);
-}
-
 .diff-label {
-  color: var(--text-tertiary);
-  font-size: 12.5px;
+  color: var(--text-secondary);
 }
 
 .diff-old {
-  color: var(--danger-color);
+  color: var(--text-secondary);
   text-decoration: line-through;
-  text-decoration-color: rgba(214, 69, 69, 0.4);
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .diff-arrow {
-  color: var(--text-tertiary);
+  color: var(--text-tertiary, var(--text-secondary));
   text-align: center;
 }
 
 .diff-new {
-  color: var(--success-color);
-  font-weight: 600;
-  word-break: break-all;
+  color: var(--success-color, #1d9e75);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

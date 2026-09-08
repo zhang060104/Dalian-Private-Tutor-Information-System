@@ -3,8 +3,8 @@ import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useSystemStore, ROLE_HOME } from '@/stores/system'
-import { GRADE_OPTIONS, SUBJECT_OPTIONS } from '@/data/tutors'
-import { encodeGrades, encodeSubjects } from '@/utils/availability'
+import { GRADE_LEVELS, SUBJECT_OPTIONS } from '@/data/tutors'
+import { encodeSubjects } from '@/utils/availability'
 import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import type { Role } from '@/types'
 
@@ -19,7 +19,6 @@ const role = ref<Role>((route.query.role as Role) === 'student' ? 'student' : 't
 const isTeacher = computed(() => role.value === 'teacher')
 
 const form = reactive({
-  username: '',
   password: '',
   confirm: '',
   name: '',
@@ -27,12 +26,10 @@ const form = reactive({
   phone: '',
   // 老师
   subjects: [] as string[],
-  grades: [] as string[],
+  grade: undefined as number | undefined, // 可授年级 / 学生年级（单一数值编码）
   intro: '',
   // 学生
-  grade: '',
-  subject: '',
-  guardian: '',
+  subject: '', // 辅导科目（单选）
   note: '',
   // 一周空余时间：7 个 int（0=周一…6=周日，低 24 位=当天 0-23 点是否有空）
   availability: [0, 0, 0, 0, 0, 0, 0] as number[],
@@ -46,19 +43,16 @@ function switchRole(r: Role) {
 }
 
 function validate(): string {
-  if (!/^[a-zA-Z0-9_]{3,20}$/.test(form.username)) return '用户名需为 3-20 位字母/数字/下划线'
   if (form.password.length < 6) return '密码至少 6 位'
   if (form.password !== form.confirm) return '两次输入的密码不一致'
   if (!form.name.trim()) return '请填写姓名'
-  if (!form.phone.trim()) return '请填写联系电话'
+  if (!/^\d{11}$/.test(form.phone.trim())) return '请填写 11 位手机号'
+  if (form.grade === undefined) return '请选择年级'
   if (isTeacher.value) {
     if (!form.subjects.length) return '请选择主教科目'
-    if (!form.grades.length) return '请选择可教年级'
     if (!form.intro.trim()) return '请填写个人简介'
   } else {
-    if (!form.grade) return '请选择学生年级'
     if (!form.subject) return '请选择辅导科目'
-    if (!form.guardian.trim()) return '请填写家长称呼'
   }
   return ''
 }
@@ -72,33 +66,30 @@ async function submit() {
   submitting.value = true
   try {
     if (isTeacher.value) {
-      store.registerTeacher({
-        username: form.username.trim(),
+      await store.registerTeacher({
         password: form.password,
         name: form.name.trim(),
         gender: form.gender,
         phone: form.phone.trim(),
         subjects: encodeSubjects(form.subjects),
-        grades: encodeGrades(form.grades),
+        grade: form.grade as number,
         intro: form.intro.trim(),
         availability: [...form.availability],
       })
     } else {
-      store.registerStudent({
-        username: form.username.trim(),
+      await store.registerStudent({
         password: form.password,
         name: form.name.trim(),
         gender: form.gender,
         phone: form.phone.trim(),
-        grade: form.grade,
+        grade: form.grade as number,
         subjects: encodeSubjects([form.subject]),
-        guardian: form.guardian.trim(),
         note: form.note.trim() || undefined,
         availability: [...form.availability],
       })
     }
     // 入驻成功自动登录进入对应工作台
-    store.login(form.username.trim(), form.password, role.value)
+    await store.login(form.phone.trim(), form.password, role.value)
     ElMessage.success('入驻成功，欢迎加入大连私人家教中心！')
     router.replace(ROLE_HOME[role.value])
   } catch (e) {
@@ -128,11 +119,6 @@ async function submit() {
 
       <el-form label-position="top" size="large" @submit.prevent="submit">
         <el-row :gutter="14">
-          <el-col :span="12">
-            <el-form-item label="用户名（登录账号）" required>
-              <el-input v-model="form.username" placeholder="3-20 位字母/数字/下划线" />
-            </el-form-item>
-          </el-col>
           <el-col :span="12">
             <el-form-item label="姓名" required>
               <el-input v-model="form.name" placeholder="真实姓名" />
@@ -170,10 +156,10 @@ async function submit() {
               <el-checkbox v-for="s in SUBJECT_OPTIONS" :key="s" :value="s" border>{{ s }}</el-checkbox>
             </el-checkbox-group>
           </el-form-item>
-          <el-form-item label="可教年级（可多选）" required>
-            <el-checkbox-group v-model="form.grades">
-              <el-checkbox v-for="g in GRADE_OPTIONS" :key="g" :value="g" border>{{ g }}</el-checkbox>
-            </el-checkbox-group>
+          <el-form-item label="可授年级" required>
+            <el-select v-model="form.grade" placeholder="选择可授年级" style="width: 100%">
+              <el-option v-for="g in GRADE_LEVELS" :key="g.value" :label="g.label" :value="g.value" />
+            </el-select>
           </el-form-item>
           <el-form-item label="个人简介（教学经验 / 风格）" required>
             <el-input v-model="form.intro" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="一句话介绍自己，帮助学生了解你" />
@@ -186,7 +172,7 @@ async function submit() {
             <el-col :span="12">
               <el-form-item label="学生年级" required>
                 <el-select v-model="form.grade" placeholder="选择年级" style="width: 100%">
-                  <el-option v-for="g in GRADE_OPTIONS" :key="g" :label="g" :value="g" />
+                  <el-option v-for="g in GRADE_LEVELS" :key="g.value" :label="g.label" :value="g.value" />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -195,11 +181,6 @@ async function submit() {
                 <el-select v-model="form.subject" placeholder="选择科目" style="width: 100%">
                   <el-option v-for="s in SUBJECT_OPTIONS" :key="s" :label="s" :value="s" />
                 </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="家长称呼" required>
-                <el-input v-model="form.guardian" placeholder="如：王先生 / 李女士" />
               </el-form-item>
             </el-col>
           </el-row>

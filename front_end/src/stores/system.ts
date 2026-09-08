@@ -8,16 +8,17 @@ import type {
   StudentAccount,
   TeacherAccount,
 } from '@/types'
-import { encodeDay, encodeGrades, encodeSubjects } from '@/utils/availability'
+import * as api from '@/api'
+import { TOKEN_KEY } from '@/api/http'
+import type { LoginResult, OrderDto, StudentDto, TeacherDto } from '@/api'
 
 /**
- * 角色账号体系 Store（前端演示模式）
+ * 角色账号体系 Store（已接入后端 API）
  *
- * ⚠️ 当前无后端：账号 / 资料 / 师生选择关系全部保存在浏览器 localStorage。
- * 后续接入后端后，本模块替换为 API 调用，组件层无需大改。
+ * 数据来源：/api 后端接口；登录令牌存 localStorage（tutor_token），
+ * 当前登录人缓存到 localStorage（tutor_system_current）供路由守卫读取。
  */
 
-const LS_DATA = 'tutor_system_v2' // v2：空余时间(7×int) + 科目/年级位掩码；含 reviews（资料修改审核队列）
 const LS_CURRENT = 'tutor_system_current'
 
 export const ROLE_HOME: Record<Role, string> = {
@@ -26,85 +27,61 @@ export const ROLE_HOME: Record<Role, string> = {
   student: '/student/home',
 }
 
+/* ---------------- 字段映射（后端实体 → 前端类型） ---------------- */
+
+function teacherFromDto(dto: TeacherDto): TeacherAccount {
+  return {
+    id: dto.id,
+    password: '',
+    role: 'teacher',
+    name: dto.nickname,
+    phone: dto.phone,
+    createdAt: '',
+    gender: (dto.gender as '男' | '女') ?? '男',
+    subjects: dto.subject ?? 0,
+    grade: dto.grade ?? 0,
+    intro: dto.description ?? '',
+    availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
+  }
+}
+
+function studentFromDto(dto: StudentDto): StudentAccount {
+  return {
+    id: dto.id,
+    password: '',
+    role: 'student',
+    name: dto.nickname,
+    phone: dto.phone,
+    createdAt: '',
+    gender: (dto.gender as '男' | '女') ?? '男',
+    grade: dto.grade ?? 0,
+    subjects: dto.subject ?? 0,
+    note: dto.description || undefined,
+    availability: [dto.timeTable1, dto.timeTable2, dto.timeTable3, dto.timeTable4, dto.timeTable5, dto.timeTable6, dto.timeTable7].map((v) => v ?? 0),
+  }
+}
+
+function accountFromLogin(res: LoginResult): AnyAccount {
+  if (res.role === 'admin') {
+    return { id: res.id, password: '', role: 'admin', name: res.nickname, phone: res.phone, createdAt: '' }
+  }
+  if (res.role === 'teacher') {
+    return {
+      id: res.id, password: '', role: 'teacher', name: res.nickname, phone: res.phone, createdAt: '',
+      gender: '男', subjects: 0, grade: 0, intro: '', availability: [0, 0, 0, 0, 0, 0, 0],
+    }
+  }
+  return {
+    id: res.id, password: '', role: 'student', name: res.nickname, phone: res.phone, createdAt: '',
+    gender: '男', grade: 0, subjects: 0, availability: [0, 0, 0, 0, 0, 0, 0],
+  }
+}
+
 /* ---------------- 持久化工具 ---------------- */
 
-function now(): string {
-  return new Date().toISOString()
-}
-
-/** 空余时间快捷模板：工作日 8-19 点 / 周末 9-17 点 */
-function weekdaysTemplate(weekend?: boolean): number[] {
-  const work = encodeDay([8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
-  const rest = encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17])
-  return weekend ? [work, work, work, work, work, rest, rest] : [work, work, work, work, work, work, work]
-}
-
-function seedData(): { users: AnyAccount[]; relations: MatchRelation[]; reviews: ProfileReview[] } {
-  const t = now()
-  const users: AnyAccount[] = [
-    { username: 'admin', password: '123456', role: 'admin', name: '系统管理员', phone: '0411-8888-6666', createdAt: t },
-    {
-      username: 'teacher1', password: '123456', role: 'teacher', name: '张明', gender: '男',
-      phone: '13800000001', createdAt: t,
-      subjects: encodeSubjects(['数学']),
-      grades: encodeGrades(['初一', '初二', '初三']),
-      intro: '专注中考数学提分，耐心细致，带过 200+ 学生。',
-      availability: weekdaysTemplate(),
-    },
-    {
-      username: 'teacher2', password: '123456', role: 'teacher', name: '李婷', gender: '女',
-      phone: '13800000002', createdAt: t,
-      subjects: encodeSubjects(['英语']),
-      grades: encodeGrades(['小学', '初一', '初二']),
-      intro: '少儿英语启蒙与应试结合，课堂活泼。',
-      availability: [encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([17, 18, 19, 20]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15]), encodeDay([8, 9, 10, 11, 12, 13, 14, 15])],
-    },
-    {
-      username: 'teacher3', password: '123456', role: 'teacher', name: '王强', gender: '男',
-      phone: '13800000003', createdAt: t,
-      subjects: encodeSubjects(['物理', '数学']),
-      grades: encodeGrades(['高一', '高二', '高三']),
-      intro: '高中物理竞赛辅导经验，擅长体系化教学。',
-      availability: weekdaysTemplate(),
-    },
-    {
-      username: 'student1', password: '123456', role: 'student', name: '王小雨', gender: '女',
-      phone: '13900000001', createdAt: t, grade: '初二', subjects: encodeSubjects(['数学']),
-      guardian: '王先生（家长）', note: '希望周末上午上课',
-      availability: [encodeDay([]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([18, 19, 20, 21]), encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17]), encodeDay([9, 10, 11, 12, 13, 14, 15, 16, 17])],
-    },
-    {
-      username: 'student2', password: '123456', role: 'student', name: '刘畅', gender: '男',
-      phone: '13900000002', createdAt: t, grade: '高一', subjects: encodeSubjects(['物理']),
-      guardian: '刘女士（家长）',
-      availability: [encodeDay([19, 20, 21]), encodeDay([19, 20, 21]), encodeDay([]), encodeDay([19, 20, 21]), encodeDay([19, 20, 21]), encodeDay([9, 10, 11, 12, 13, 14, 15]), encodeDay([])],
-    },
-    {
-      username: 'student3', password: '123456', role: 'student', name: '陈曦', gender: '女',
-      phone: '13900000003', createdAt: t, grade: '小学六年级', subjects: encodeSubjects(['英语']),
-      guardian: '陈先生（家长）', note: '基础薄弱，需耐心',
-      availability: weekdaysTemplate(false),
-    },
-  ]
-  return { users, relations: [], reviews: [] }
-}
-
-function loadData(): { users: AnyAccount[]; relations: MatchRelation[]; reviews: ProfileReview[] } {
-  try {
-    const raw = localStorage.getItem(LS_DATA)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed.users) && Array.isArray(parsed.relations)) {
-        // 兼容旧版本数据：v2 之前无 reviews 字段
-        return { users: parsed.users, relations: parsed.relations, reviews: parsed.reviews ?? [] }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  const seeded = seedData()
-  localStorage.setItem(LS_DATA, JSON.stringify(seeded))
-  return seeded
+function saveCurrent(u: AnyAccount | null) {
+  if (u) localStorage.setItem(LS_CURRENT, JSON.stringify(u))
+  else localStorage.removeItem(LS_CURRENT)
 }
 
 /** 供路由守卫直接读取当前登录人（不依赖 Pinia 实例） */
@@ -117,33 +94,21 @@ export function loadCurrentUser(): AnyAccount | null {
   }
 }
 
-function saveCurrent(u: AnyAccount | null) {
-  if (u) localStorage.setItem(LS_CURRENT, JSON.stringify(u))
-  else localStorage.removeItem(LS_CURRENT)
-}
-
 /* ---------------- Store ---------------- */
 
 export const useSystemStore = defineStore('system', {
-  state: () => {
-    const data = loadData()
-    // current 若与 users 中的实时资料不一致（如资料刚被管理员审核通过），以 users 为准
-    const cached = loadCurrentUser()
-    const live =
-      cached && cached.role !== 'admin'
-        ? (data.users.find((u) => u.username === cached.username && u.role === cached.role) as AnyAccount | undefined)
-        : undefined
-    return {
-      users: data.users as AnyAccount[],
-      relations: data.relations as MatchRelation[],
-      reviews: data.reviews as ProfileReview[],
-      current: (live ?? cached) as AnyAccount | null,
-    }
-  },
+  state: () => ({
+    teachers: [] as TeacherAccount[],
+    students: [] as StudentAccount[],
+    relations: [] as MatchRelation[],
+    current: loadCurrentUser() as AnyAccount | null,
+    /** 我的待审资料修改申请（学生/老师） */
+    myReview: null as ProfileReview | null,
+    /** 管理端：全部待审资料修改申请 */
+    reviews: [] as ProfileReview[],
+  }),
 
   getters: {
-    teachers: (s) => s.users.filter((u) => u.role === 'teacher') as TeacherAccount[],
-    students: (s) => s.users.filter((u) => u.role === 'student') as StudentAccount[],
     isTeacher: (s) => s.current?.role === 'teacher',
     isStudent: (s) => s.current?.role === 'student',
     isAdmin: (s) => s.current?.role === 'admin',
@@ -153,155 +118,171 @@ export const useSystemStore = defineStore('system', {
   },
 
   actions: {
-    persist() {
-      localStorage.setItem(LS_DATA, JSON.stringify({ users: this.users, relations: this.relations, reviews: this.reviews }))
-    },
-
-    /** 老师入驻（含账号 + 个人信息） */
-    registerTeacher(payload: Omit<TeacherAccount, 'role' | 'createdAt'>): TeacherAccount {
-      if (this.users.some((u) => u.username === payload.username)) {
-        throw new Error('该用户名已被注册，请更换')
+    /** 登录：phone + password + role */
+    async login(phone: string, password: string, role: Role): Promise<AnyAccount> {
+      const res = await api.login(phone, password, role)
+      localStorage.setItem(TOKEN_KEY, res.token)
+      this.current = accountFromLogin(res)
+      // 加载列表，并用完整资料覆盖当前用户
+      await this.loadAll()
+      if (role === 'teacher') {
+        const full = this.teachers.find((t) => t.id === res.id)
+        if (full) this.current = full
+      } else if (role === 'student') {
+        const full = this.students.find((s) => s.id === res.id)
+        if (full) this.current = full
       }
-      const account: TeacherAccount = { ...payload, role: 'teacher', createdAt: now() }
-      this.users.push(account)
-      this.persist()
-      return account
-    },
-
-    /** 学生入驻（含账号 + 个人信息） */
-    registerStudent(payload: Omit<StudentAccount, 'role' | 'createdAt'>): StudentAccount {
-      if (this.users.some((u) => u.username === payload.username)) {
-        throw new Error('该用户名已被注册，请更换')
-      }
-      const account: StudentAccount = { ...payload, role: 'student', createdAt: now() }
-      this.users.push(account)
-      this.persist()
-      return account
-    },
-
-    login(username: string, password: string, role: Role) {
-      const user = this.users.find(
-        (u) => u.username === username.trim() && u.password === password && u.role === role,
-      )
-      if (!user) throw new Error('用户名或密码错误，请核对角色后重试')
-      this.current = user
-      saveCurrent(user)
-      return user
+      saveCurrent(this.current)
+      return this.current
     },
 
     logout() {
       this.current = null
+      this.teachers = []
+      this.students = []
+      this.relations = []
+      this.myReview = null
+      this.reviews = []
+      localStorage.removeItem(TOKEN_KEY)
       saveCurrent(null)
     },
 
-    /** 是否已存在同向选择（去重判断用） */
-    hasRelation(teacherUsername: string, studentUsername: string, by: 'teacher' | 'student'): boolean {
-      return this.relations.some(
-        (r) => r.teacherUsername === teacherUsername && r.studentUsername === studentUsername && r.by === by,
-      )
+    /** 加载老师/学生列表 + 当前用户的选择关系 */
+    async loadAll() {
+      const [teachers, students] = await Promise.all([api.getTeachers(), api.getStudents()])
+      this.teachers = teachers.map(teacherFromDto)
+      this.students = students.map(studentFromDto)
+      await this.loadRelations()
+    },
+
+    async loadRelations() {
+      if (this.current && (this.current.role === 'teacher' || this.current.role === 'student')) {
+        const orders = await api.getMyOrders()
+        this.relations = orders.map((o) => this.orderToRelation(o))
+      }
+    },
+
+    orderToRelation(o: OrderDto): MatchRelation {
+      const teacher = this.teachers.find((t) => t.id === o.teacherId)
+      const student = this.students.find((s) => s.id === o.studentId)
+      return {
+        teacherPhone: teacher?.phone ?? '',
+        studentPhone: student?.phone ?? '',
+        by: o.status === 0 ? 'teacher' : 'student',
+        createdAt: o.createdAt ?? '',
+      }
+    },
+
+    /** 老师入驻 */
+    async registerTeacher(payload: Omit<TeacherAccount, 'role' | 'createdAt' | 'id'>): Promise<void> {
+      await api.registerTeacher({
+        nickname: payload.name,
+        password: payload.password,
+        phone: payload.phone,
+        gender: payload.gender,
+        grade: payload.grade,
+        subject: payload.subjects,
+        description: payload.intro,
+        timeTable1: payload.availability[0],
+        timeTable2: payload.availability[1],
+        timeTable3: payload.availability[2],
+        timeTable4: payload.availability[3],
+        timeTable5: payload.availability[4],
+        timeTable6: payload.availability[5],
+        timeTable7: payload.availability[6],
+      })
+    },
+
+    /** 学生入驻 */
+    async registerStudent(payload: Omit<StudentAccount, 'role' | 'createdAt' | 'id'>): Promise<void> {
+      await api.registerStudent({
+        nickname: payload.name,
+        password: payload.password,
+        phone: payload.phone,
+        gender: payload.gender,
+        grade: payload.grade,
+        subject: payload.subjects,
+        description: payload.note ?? '',
+        timeTable1: payload.availability[0],
+        timeTable2: payload.availability[1],
+        timeTable3: payload.availability[2],
+        timeTable4: payload.availability[3],
+        timeTable5: payload.availability[4],
+        timeTable6: payload.availability[5],
+        timeTable7: payload.availability[6],
+      })
     },
 
     /** 发起/取消一次选择：teacher=老师选学生；student=学生选老师 */
-    toggleSelect(targetUsername: string, role: 'teacher' | 'student') {
+    async toggleSelect(targetPhone: string, role: 'teacher' | 'student') {
       const me = this.current
       if (!me) throw new Error('请先登录')
+      let targetId: number | undefined
       if (role === 'teacher') {
-        // 当前登录的是老师，目标为学生
         if (me.role !== 'teacher') throw new Error('仅老师可发起该操作')
-        const teacherUsername = me.username
-        const studentUsername = targetUsername
-        const existed = this.hasRelation(teacherUsername, studentUsername, 'teacher')
-        this.relations = this.relations.filter(
-          (r) => !(r.teacherUsername === teacherUsername && r.studentUsername === studentUsername && r.by === 'teacher'),
-        )
-        if (!existed) this.relations.push({ teacherUsername, studentUsername, by: 'teacher', createdAt: now() })
+        targetId = this.students.find((s) => s.phone === targetPhone)?.id
       } else {
-        // 当前登录的是学生，目标为老师
         if (me.role !== 'student') throw new Error('仅学生可发起该操作')
-        const teacherUsername = targetUsername
-        const studentUsername = me.username
-        const existed = this.hasRelation(teacherUsername, studentUsername, 'student')
-        this.relations = this.relations.filter(
-          (r) => !(r.teacherUsername === teacherUsername && r.studentUsername === studentUsername && r.by === 'student'),
-        )
-        if (!existed) this.relations.push({ teacherUsername, studentUsername, by: 'student', createdAt: now() })
+        targetId = this.teachers.find((t) => t.phone === targetPhone)?.id
       }
-      this.persist()
+      if (!targetId) throw new Error('目标不存在')
+
+      const teacherPhone = role === 'teacher' ? me.phone : targetPhone
+      const studentPhone = role === 'teacher' ? targetPhone : me.phone
+      const existed = this.relations.some(
+        (r) => r.teacherPhone === teacherPhone && r.studentPhone === studentPhone && r.by === role,
+      )
+      if (existed) {
+        await api.cancelOrder(targetId, role)
+      } else {
+        await api.applyOrder(targetId, role)
+      }
+      await this.loadRelations()
     },
 
-    /** 某老师被哪些学生选择 / 某学生被哪些老师选择等查询，由组件用 getters 计算 */
-    relationsOfTeacher(username: string) {
-      return this.relations.filter((r) => r.teacherUsername === username)
+    /** 某老师相关的选择关系 */
+    relationsOfTeacher(phone: string) {
+      return this.relations.filter((r) => r.teacherPhone === phone)
     },
-    relationsOfStudent(username: string) {
-      return this.relations.filter((r) => r.studentUsername === username)
+    relationsOfStudent(phone: string) {
+      return this.relations.filter((r) => r.studentPhone === phone)
     },
 
-    /* ---------------- 个人资料修改审核（学生/老师提交 → 管理员审核） ---------------- */
+    /* ---------------- 个人资料修改审核（管理员审核制） ---------------- */
 
-    /** 该用户当前是否有待审核的资料修改申请 */
-    pendingReviewOf(username: string): ProfileReview | undefined {
-      return this.reviews.find((r) => r.username === username)
+    /** 加载我的待审申请（没有则 null） */
+    async loadMyReview() {
+      if (!this.current || this.current.role === 'admin') return
+      this.myReview = await api.getMyProfileReview()
     },
 
     /**
-     * 提交个人资料修改申请。
-     * 审核通过前 users 中保持旧资料（对外展示不变）；同一用户同时仅允许一条待审申请。
+     * 提交资料修改申请
+     * @param profile 新资料，键为后端实体字段（nickname/gender/grade/subject/description/timeTable1~7）
+     * @param fields 字段级新旧对比（只含有变化的字段）
      */
-    submitProfileReview(
-      username: string,
-      role: 'teacher' | 'student',
-      name: string,
-      next: Partial<TeacherAccount> | Partial<StudentAccount>,
-      fields: ProfileReviewField[],
-    ) {
-      if (this.pendingReviewOf(username)) {
-        throw new Error('你已有一份资料修改申请待管理员审核，请耐心等待结果')
-      }
-      const review: ProfileReview = {
-        id: `pr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        username,
-        role,
-        name,
-        submittedAt: now(),
-        next,
-        fields,
-      }
-      this.reviews.push(review)
-      this.persist()
-      return review
+    async submitProfileReview(profile: Record<string, unknown>, fields: ProfileReviewField[]) {
+      if (!this.current) throw new Error('请先登录')
+      this.myReview = await api.submitProfileReview({ name: this.current.name, fields, profile })
     },
 
-    /** 本人撤销自己的待审申请（仅登录本人可操作） */
-    cancelProfileReview(id: string) {
-      const me = this.current
-      const review = this.reviews.find((r) => r.id === id)
-      if (!review) throw new Error('申请不存在或已被处理')
-      if (!me || me.username !== review.username) throw new Error('仅申请人本人可撤销')
-      this.reviews = this.reviews.filter((r) => r.id !== id)
-      this.persist()
+    /** 撤销我的申请 */
+    async cancelMyReview() {
+      if (!this.myReview) return
+      await api.cancelProfileReview(this.myReview.id)
+      this.myReview = null
     },
 
-    /** 管理员审核通过：把申请的新资料合并进用户，移除申请 */
-    approveProfileReview(id: string) {
-      const idx = this.reviews.findIndex((r) => r.id === id)
-      if (idx < 0) throw new Error('申请不存在或已被处理')
-      const review = this.reviews[idx]
-      const user = this.users.find((u) => u.username === review.username && u.role === review.role)
-      if (!user) throw new Error('对应用户不存在')
-      Object.assign(user, review.next)
-      // 若被修改的正是当前登录会话（极少见），同步刷新登录态
-      if (this.current?.username === review.username) saveCurrent(user)
-      this.reviews.splice(idx, 1)
-      this.persist()
+    /** 管理端：加载待审申请列表 */
+    async loadReviews() {
+      this.reviews = await api.adminReviews()
     },
 
-    /** 管理员审核驳回：丢弃申请（保留原资料） */
-    rejectProfileReview(id: string) {
-      const idx = this.reviews.findIndex((r) => r.id === id)
-      if (idx < 0) throw new Error('申请不存在或已被处理')
-      this.reviews.splice(idx, 1)
-      this.persist()
+    /** 管理端：通过（新资料生效）/ 驳回 */
+    async resolveReview(id: number, approve: boolean) {
+      await api.resolveRequest(id, approve)
+      await this.loadReviews()
+      if (approve) await this.loadAll()
     },
   },
 })

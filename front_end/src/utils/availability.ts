@@ -10,7 +10,7 @@
  * - options 列表第 i 项被选中 ⇔ 掩码第 i 位 = 1
  */
 
-import { GRADE_OPTIONS, SUBJECT_OPTIONS } from '@/data/tutors'
+import { SUBJECT_OPTIONS } from '@/data/tutors'
 
 export const DAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'] as const
 
@@ -103,14 +103,4 @@ export function decodeSubjects(mask: number): string[] {
 /** 便捷方法：科目文本 → 掩码 */
 export function encodeSubjects(labels: string[]): number {
   return encodeOptions(labels, SUBJECT_OPTIONS)
-}
-
-/** 便捷方法：年级掩码 → 文本 */
-export function decodeGrades(mask: number): string[] {
-  return decodeOptions(mask, GRADE_OPTIONS)
-}
-
-/** 便捷方法：年级文本 → 掩码 */
-export function encodeGrades(labels: string[]): number {
-  return encodeOptions(labels, GRADE_OPTIONS)
 }
