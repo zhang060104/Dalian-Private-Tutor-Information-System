@@ -100,6 +100,37 @@ export interface MatchRelation {
   createdAt: string
 }
 
+/* ==================== 个人资料修改审核 ==================== */
+
+/** 单个字段的变更对比（面向管理端审核展示） */
+export interface ProfileReviewField {
+  /** 字段中文名，如「姓名」「主教科目」 */
+  label: string
+  /** 审核前（当前生效）的值文本 */
+  old: string
+  /** 申请修改后的值文本 */
+  next: string
+}
+
+/**
+ * 个人资料修改申请（老师/学生提交 → 管理员审核）
+ *
+ * 审核通过前：users 中仍是旧资料（对外展示不受影响，即"审核期间沿用旧信息"）；
+ * 通过后由管理员将 next 合并进对应用户；驳回/撤销则直接移除本条申请。
+ */
+export interface ProfileReview {
+  id: string
+  username: string
+  role: 'teacher' | 'student'
+  /** 提交人姓名（提交时快照，便于后台展示） */
+  name: string
+  submittedAt: string
+  /** 申请的新资料（含位掩码编码后的字段；approve 时合并到用户） */
+  next: Partial<TeacherAccount> | Partial<StudentAccount>
+  /** 字段级变更清单（只含有变化的字段） */
+  fields: ProfileReviewField[]
+}
+
 /** 角色中文名 */
 export const ROLE_LABEL: Record<Role, string> = {
   admin: '管理员',
