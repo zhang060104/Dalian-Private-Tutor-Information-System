@@ -86,3 +86,58 @@ URL 平铺：`/directory` `/person/:role/:id` `/me` `/orders` `/order/:id` `/ord
 
 **验证**：`npm run type-check` 全绿；`vite build` 成功；dev 各新模块 200。
 - 提交人：Claw 助手 / zhang060104 授权
+
+---
+
+## 2026-09-09 · 后端接口全量接入 + 滑块对接后端 + mock 数据删除
+
+**滑块验证码（对接真实后端）**
+- `SliderCaptcha.vue` 完全重写：拉取 `GET /api/captcha`（含 base64 背景图+拼块图），canvas 自动扫描
+  背景上白色描边矩形定位缺口垂直 y（CaptchaVO 不返回 y），拖动拼块对齐缺口后 `POST /api/captcha/verify`
+  返回 token 持有 5 分钟，组件 `@success(token)` 通知父组件持有 captchaToken。
+- 5 处使用点（Register/Me/Person/OrderEdit/OrderDetail×2）改造：组件不再只是布尔放行，token 透传给
+  业务请求（注册/资料修改/发起订单/缴费上传/仲裁）。
+
+**http 客户端重写（统一响应拦截）**
+- 解包 `{code,message,data}` 信封 → 仅返回 `data`；code≠0 弹 toast 并抛错；401 清 token 并跳转登录页
+  （admin 区跳 /admin，门户跳 /login）；ECONNABORTED 超时/5xx 兜底提示。
+- vite proxy：`/api → http://localhost:8083`、`/files → 同`（用于后端上传文件直接预览）。
+
+**api 层全部切真实后端**
+- `api/auth.ts`：login(role, phone, password) / adminLogin / register(RegisterPayloadDTO 含 timeTable1..7)
+- `api/users.ts`：listStudents/listTeachers/getPerson/getMyProfile/setSeeking/requestProfileChange
+- `api/orders.ts`：订单全状态机（apply/confirm/reject/cancel/detail/confirm-detail/payment/trial-pass/
+  settle/arbitrate）+ listMine + getOrder；DTO → Profile/Order 转换（含 timeTable1..7↔[7]）
+- `api/admin.ts`：stats / requests(pending/type) / resolve / listAllOrders / getOrderAdmin / listAdminUsers
+  / adjustCredit / uploadInfoFeeQr / admins CRUD（仅超管）
+
+**types 字段命名统一 camelCase**（与后端 MyBatis map-underscore-to-camel-case 对齐）
+- Order：hourly_wage → hourlyWage；depositImgTea → teaDepositImg 等；status:0|1 → number
+- 删除不再使用的 LoginPayload/LoginResult/RegisterPayload/Student/Teacher/Admin/Profile 子接口
+
+**mock 数据全部删除**
+- 删除 `src/data/mock.ts` 与 `src/data/mockApi.ts`（含种子用户/订单/状态机/一键填充演示账号）
+- 同步删除 Login.vue 的演示账号一键填充 tag，AdminLogin.vue tip 改为后端 seed 真实账号（超管
+  13800000000/123456，运营 13800000009/123456）
+
+**页面改造**（逐个切真实 API 并串联 captchaToken）
+- Login：删除演示一键填充，调 `auth.login(role, phone, password)`
+- Register：3 张证件图真实 multipart 上传，调 `auth.register` 带 captchaToken
+- Me：资料修改走 `requestProfileChange(role, captchaToken, patch)`，持有 token 后才放行
+- Person：发起匹配走 `createOrder(targetId, captchaToken)`，后端自动带学科/时间交集
+- OrderEdit：明细提交带位掩码多科目，submitOrderInfo(oid, patch)
+- OrderDetail：缴费 + 仲裁真实 multipart 上传，调对应 API
+- Orders：listMyOrders(role, scope)，scope: active|all
+- admin/*（Dashboard/Orders/OrderAdminDetail/Payments/Arbitrations/UserAudit/Credit/Admins/UserArchive）：
+  全部以 `listRequests/resolveRequest/listAllOrders/getOrderAdmin/getUserAdmin/listAllUsers/...` 真实接入
+
+**后端 seed（演示账号）**
+- 学生：13900000001~03；教师：13800000001~03；超管：13800000000；运营：13800000009；密码 123456
+- 教师 grade 已全 17（已毕业）以契合"大学生兼职/全职教师"语义
+
+**验证**
+- `npm run type-check` 全绿；`npm run build` 成功
+- vite proxy + 后端 8083 实测：captcha 200，code=0 返回 data，401/500 弹对应错
+- dev server 持续 HMR 工作（task_id jcXN4j 仍跑）
+
+**提交人**：Claw 助手 / zhang060104 授权
