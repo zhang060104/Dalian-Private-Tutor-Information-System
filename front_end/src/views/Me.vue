@@ -129,7 +129,7 @@ onMounted(load)
           </div>
         </div>
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="年级">{{ gradeLabel(me.grade) }}</el-descriptions-item>
+          <el-descriptions-item :label="meRole === 'teacher' ? '本人年级' : '年级'">{{ gradeLabel(me.grade) }}</el-descriptions-item>
           <el-descriptions-item label="性别">{{ me.gender ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="年龄">{{ me.age ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="科目">{{ subjectsText(me) }}</el-descriptions-item>
@@ -161,14 +161,14 @@ onMounted(load)
       <el-alert type="warning" :closable="false" show-icon class="mb-16">修改需提交管理员审核，审核通过后新资料生效</el-alert>
       <el-form ref="editFormRef" :model="edit" label-position="top">
         <el-row :gutter="16">
-          <el-col :span="8"><el-form-item label="年龄"><el-input-number v-model="edit.age" :min="6" :max="90" :controls="false" style="width: 100%" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="年龄"><el-input-number v-model="edit.age" :min="1" :max="99" :controls="false" style="width: 100%" /></el-form-item></el-col>
           <el-col :span="8">
             <el-form-item label="性别">
               <el-radio-group v-model="edit.gender"><el-radio-button value="男">男</el-radio-button><el-radio-button value="女">女</el-radio-button></el-radio-group>
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="meRole === 'teacher' ? '可授年级' : '年级'">
+            <el-form-item :label="meRole === 'teacher' ? '本人年级（学历阶段）' : '年级'">
               <el-select v-model="edit.grade" style="width: 100%">
                 <el-option v-for="g in (meRole === 'teacher' ? TEACHER_GRADE_LEVELS : GRADE_LEVELS)" :key="g.value" :label="g.label" :value="g.value" />
               </el-select>

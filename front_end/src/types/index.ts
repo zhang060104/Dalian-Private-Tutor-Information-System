@@ -72,7 +72,7 @@ export interface Order {
   id: number
   student_id: number
   teacher_id: number
-  /** 授课科目（24 位掩码，约定为单选语义仍存 int） */
+  /** 授课科目（24 位掩码，可多科并存；1 表示含该科目，见 utils/subject.ts） */
   subject: number
   /** 时薪（元/小时） */
   hourly_wage: number

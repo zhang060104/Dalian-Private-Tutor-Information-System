@@ -114,7 +114,7 @@ function submitManual() {
     <el-dialog v-model="manualOpen" title="手动修改用户信息后通过" width="560px">
       <el-form label-position="top">
         <el-form-item label="昵称"><el-input v-model="manual.nickname" /></el-form-item>
-        <el-form-item label="年龄"><el-input-number v-model="manual.age" :min="6" :max="90" :controls="false" /></el-form-item>
+        <el-form-item label="年龄"><el-input-number v-model="manual.age" :min="1" :max="99" :controls="false" /></el-form-item>
         <el-form-item label="年级">
           <el-select v-model="manual.grade">
             <el-option v-for="g in 18" :key="g - 1" :label="gradeLabel(g - 1)" :value="g - 1" />

@@ -5,7 +5,7 @@ import { ElMessage, type FormInstance } from 'element-plus'
 import type { Order, Role, WeekTimeTables } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { getOrder, submitOrderInfo, confirmOrderInfo } from '@/api/orders'
-import { SUBJECTS } from '@/utils/subject'
+import { SUBJECTS, decodeSubjects, encodeSubjects } from '@/utils/subject'
 import { orderStatus } from '@/utils/order'
 import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
@@ -17,7 +17,7 @@ const oid = Number(route.params.id)
 const role = (auth.role ?? 'teacher') as 'student' | 'teacher'
 
 const order = ref<Order | null>(null)
-const form = reactive({ subject: undefined as number | undefined, hourlyWage: 0, description: '', timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables })
+const form = reactive({ subjects: [] as number[], hourlyWage: 0, description: '', timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables })
 const captchaOk = ref(false)
 const saving = ref(false)
 const loading = ref(true)
@@ -26,7 +26,8 @@ async function load() {
   loading.value = true
   try {
     order.value = await getOrder(oid, role)
-    form.subject = order.value.subject
+    // 位掩码解码为已选科目下标数组（多选）
+    form.subjects = decodeSubjects(order.value.subject).map((name) => SUBJECTS.indexOf(name)).filter((i) => i >= 0)
     form.hourlyWage = order.value.hourly_wage
     form.description = order.value.description
     form.timeTables = [...order.value.timeTables] as WeekTimeTables
@@ -42,13 +43,13 @@ onMounted(load)
 /** 提交修改，交给对方审核 */
 async function submitChange() {
   if (!order.value) return
-  if (form.subject === undefined) return ElMessage.warning('请选择授课科目')
+  if (!form.subjects.length) return ElMessage.warning('请至少选择一个授课科目')
   if (!form.hourlyWage) return ElMessage.warning('请填写时薪')
   if (!captchaOk.value) return ElMessage.warning('请先完成滑块验证')
   saving.value = true
   try {
     await submitOrderInfo(order.value.id, role, {
-      subject: 1 << form.subject,
+      subject: encodeSubjects(form.subjects),
       hourly_wage: form.hourlyWage,
       description: form.description,
       timeTables: form.timeTables,
@@ -96,8 +97,8 @@ const isReviewer = () => {
         </el-alert>
 
         <el-form label-position="top" size="large">
-          <el-form-item label="授课科目">
-            <el-select v-model="form.subject" placeholder="选择授课科目" style="width: 100%">
+          <el-form-item label="授课科目（可多选）">
+            <el-select v-model="form.subjects" multiple placeholder="选择一个或多个授课科目" style="width: 100%">
               <el-option v-for="(s, i) in SUBJECTS" :key="s" :label="s" :value="i" />
             </el-select>
           </el-form-item>

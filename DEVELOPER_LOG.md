@@ -182,3 +182,13 @@
 **交付**：ack_end/API说明文档.md（完整契约，供前端对接）
 - 端口 8083；启动：set DB_PASSWORD=xxx && mvn spring-boot:run；可选 TUTOR_TOKEN_SECRET / TUTOR_UPLOAD_DIR / TUTOR_CAPTCHA_DISABLED
 - 提交人：Tinker 🔧（离谱人授权继续）
+---
+
+## 2026-09-09 · 前端收尾（登录隔离 / 后台全部订单 / 科目多选 / 教师 grade 语义）feature/backend-service
+
+**本次前端改动（前端 DEVLOG 有详录）**：门户登录删管理员入口并修复 `/admin` 直达守卫、管理员登录独立通道；
+后台新增「全部订单 /admin/orders + /admin/order/:id 只读详情」及信用分→用户档案跳转 `/admin/user/:role/:id`(含历史订单)；
+教师 grade 语义修正为本人学历阶段；订单科目单选改多选(位掩码)；年龄范围 1-99。
+**文档**：提交根目录《项目设计说明文档.md》(前端开发依据与后端定稿正本)。
+后端(8083)已于前述 d19a9fe 提交推送；本提交为前端版本收敛，供后端接口接入前定格。
+- 提交人：Claw 助手 / zhang060104 授权

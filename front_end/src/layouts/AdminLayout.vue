@@ -13,6 +13,7 @@ const isAdmin = computed(() => auth.role === 'admin')
 
 const menus = [
   { path: '/admin/dashboard', label: '后台概览' },
+  { path: '/admin/orders', label: '全部订单' },
   { path: '/admin/users', label: '注册与资料审核' },
   { path: '/admin/payments', label: '缴费核验' },
   { path: '/admin/arbitrations', label: '毁约仲裁' },

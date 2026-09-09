@@ -47,3 +47,42 @@ URL 平铺：`/directory` `/person/:role/:id` `/me` `/orders` `/order/:id` `/ord
 **验证**：`npm run type-check` 全绿；`vite build` 成功(全部路由 chunk 生成)；dev server 各页 200。
 **注意**：主 chunk ~872KB 因 Element Plus 全量引入，如需可后续改按需(未做，避免过度)。
 - 提交人：Claw 助手 / zhang060104 授权
+
+---
+
+## 2026-09-09 · 前端收尾几轮（登录隔离 / 后台全部订单 / 科目多选 / 语义修正）
+
+**登录隔离**
+- 门户登录页删脚注「管理员入口」；后台 `/admin` 无入口、凭 URL 直达。
+- 修复守卫 bug：原 admin 区只处理 `meta.admin`(保护页)，漏 `adminPublic`(登录页)，
+  未登录访问 `/admin` 被末尾门户规则踢去 `/login`。改为**按路径前缀分流**：`/admin`、`/admin/*`
+  一律走独立后台块，与门户跳转规则完全隔离。
+- 管理员登录彻底独立：新增 `mock.ts mockAdminLogin`、`api/auth.ts adminLogin`(真实指向
+  /auth/admin/login)、`stores/auth.ts loginAdmin` action；`AdminLogin.vue` 用 `auth.loginAdmin`
+  + `account` 字段，不再走通用 `auth.login({role:'admin'})`。
+- mock 缓存键升 **dl_tutor_mock_v2**（逼旧 localStorage 重播 seed）。
+
+**后台「全部订单」+ 跳转贯通（只读后台族）**
+- 侧栏新增「全部订单」→ `/admin/orders`(Orders.vue el-table)；行点跳 `/admin/order/:id` 只读订单详情
+  (OrderAdminDetail.vue：双方/科目/时薪/信息费/时间表/缴费核验3位)。状态一律 `orderStatus().name` 中文，
+  不露 status 码。
+- 毁约仲裁 Arbitrations：订单号改可点链接 + 「查看订单详情」按钮 → 订单详情。
+- 信用分 Credit：昵称列 + 「查看」列(个人主页/历史订单) → 新后台用户档案 `/admin/user/:role/:id`
+  (UserArchive.vue：el-tabs「个人资料」+「历史订单」，订单行可再进订单详情)。
+- `api/admin.ts`：抽 `toAdminRows` 公共映射；新增 `listOrdersForUserAdmin`/`getUserAdmin`/
+  `listAllOrders`/`getOrderAdmin`。后台全部用独立只读页，不复用门户 OrderDetail(myActions 面向学生/教师)。
+
+**教师 grade 语义 = 本人学历阶段（勿当"可授年级"）**
+- `grade.ts` 注释 + TEACHER_GRADE_LEVELS(13-16大学生/17已毕业)写清；Register/Me 表单 label 改
+  「本人年级」，展示区同步；可授科目仍由 subject 表达。
+- seed 修正 4 位"在职/退休/研究生/毕业"教师原误当可教年级的 grade(13/15/14/12) → 全 17。
+
+**订单科目单选择多选（位掩码）**
+- Person(下单) + OrderEdit(信息确认)：subject:number → subjects:number[]，el-select multiple，
+  提交 `encodeSubjects()`、加载 `decodeSubjects→indexOf` 还原。
+- ⭐ 顺带修复 Person 下单把"裸科目下标当掩码"的 bug(选 index3 会成 语文+数学)；types Order.subject 注释改多科。
+
+**年龄范围**：注册/我的资料/管理员手动改单三处 el-input-number `:min="1" :max="99"`(>0 且 <100)。
+
+**验证**：`npm run type-check` 全绿；`vite build` 成功；dev 各新模块 200。
+- 提交人：Claw 助手 / zhang060104 授权

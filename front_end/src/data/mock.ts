@@ -8,7 +8,7 @@ import type {
   RequestLog, RequestType, Role, Student, Teacher, WeekTimeTables,
 } from '@/types'
 
-const LS_KEY = 'dl_tutor_mock_v1'
+const LS_KEY = 'dl_tutor_mock_v2'
 
 /** 存储层用户（含登录用的顶层 phone） */
 export type StoredStudent = Student & { password: string; phone: string }
@@ -151,7 +151,7 @@ function buildSeed(): Db {
   const teachers: StoredTeacher[] = [
     {
       id: 1, role: 'teacher', nickname: '王老师', password: '123456', phone: '13800000001',
-      age: 32, gender: '女', credit: 120, grade: 13, subject: (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4),
+      age: 32, gender: '女', credit: 120, grade: 17, subject: (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4),
       description: '重点中学在职数学教师，8 年教龄，擅长初中高中数学培优与中考冲刺。',
       status: 0, address: '中山区（缴费后可见精确地址）',
       timeTables: days([[18, 19, 20], [18, 19, 20], [18, 19], [0, 0], [0, 0], [8, 9, 10, 11, 14, 15], [8, 9, 10, 11, 14, 15, 16]]),
@@ -160,7 +160,7 @@ function buildSeed(): Db {
     },
     {
       id: 2, role: 'teacher', nickname: '李老师', password: '123456', phone: '13800000002',
-      age: 28, gender: '男', credit: 100, grade: 15, subject: (1 << 19) | (1 << 20) | (1 << 1),
+      age: 28, gender: '男', credit: 100, grade: 17, subject: (1 << 19) | (1 << 20) | (1 << 1),
       description: '计算机研究生在读，可辅导 C/C++/Python、算法竞赛与数据结构。',
       status: 0, address: '高新园区',
       timeTables: days([[0, 0], [19, 20, 21], [19, 20, 21], [19, 20, 21], [0, 0], [10, 11, 14, 15, 16], [10, 11, 14, 15, 16]]),
@@ -169,7 +169,7 @@ function buildSeed(): Db {
     },
     {
       id: 3, role: 'teacher', nickname: '张老师', password: '123456', phone: '13800000003',
-      age: 26, gender: '女', credit: 90, grade: 14, subject: (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14),
+      age: 26, gender: '女', credit: 90, grade: 17, subject: (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14),
       description: '美术院校毕业，可带素描/色彩/速写艺考，也教钢琴与吉他入门。',
       status: 0, address: '沙河口区',
       timeTables: days([[16, 17, 18, 19], [16, 17, 18], [0, 0], [16, 17, 18, 19], [0, 0], [9, 10, 11, 13, 14, 15, 16], [9, 10, 11, 13, 14, 15]]),
@@ -178,7 +178,7 @@ function buildSeed(): Db {
     },
     {
       id: 4, role: 'teacher', nickname: '刘老师', password: '123456', phone: '13800000004',
-      age: 45, gender: '男', credit: 135, grade: 12, subject: (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6),
+      age: 45, gender: '男', credit: 135, grade: 17, subject: (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6),
       description: '退休重点高中物理化学教师，20 年高三把关经验。',
       status: 0, address: '甘井子区',
       timeTables: days([[0, 0], [18, 19, 20], [18, 19, 20], [18, 19, 20], [18, 19, 20], [8, 9, 10, 11, 14, 15, 16], [8, 9, 10, 11, 14, 15, 16, 17]]),
@@ -253,6 +253,14 @@ export async function mockLogin(p: LoginPayload): Promise<LoginResult> {
   const u = arr.find((x) => x.phone === p.phone && x.password === p.password)
   if (!u) throw new Error('手机号或密码错误，或该账号尚未通过审核')
   return delay({ token: 'mock-token-' + p.role + '-' + u.id, role: u.role, id: u.id, nickname: u.nickname })
+}
+
+// ---------------------- 管理员登录（mock，独立实现，不混入通用 mockLogin） ----------------------
+export async function mockAdminLogin(account: string, password: string): Promise<LoginResult> {
+  const d = load()
+  const a = d.admins.find((x) => (x.phone === account || x.nickname === account) && x.password === password)
+  if (!a) throw new Error('管理员账号或密码错误')
+  return delay({ token: 'mock-token-admin-' + a.id, role: 'admin', id: a.id, nickname: a.nickname })
 }
 
 // ---------------------- 对外便捷读取原始记录 ----------------------

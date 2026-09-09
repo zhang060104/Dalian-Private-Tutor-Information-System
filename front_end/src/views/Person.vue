@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getPerson } from '@/api/users'
 import { createOrder } from '@/api/orders'
 import { gradeLabel } from '@/utils/grade'
-import { decodeSubjects, SUBJECTS } from '@/utils/subject'
+import { decodeSubjects, encodeSubjects, SUBJECTS } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
 import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
@@ -31,21 +31,22 @@ const canTrial = computed(() => meRole.value === 'student' && role === 'teacher'
 
 // 发起匹配弹窗
 const dlg = ref(false)
-const form = reactive({ subject: undefined as number | undefined, hourlyWage: 100, timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables })
+const form = reactive({ subjects: [] as number[], hourlyWage: 100, timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables })
 const captchaOk = ref(false)
 const submitting = ref(false)
 
 function openDialog() {
   captchaOk.value = false
+  form.subjects = []
   form.timeTables = [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables
   dlg.value = true
 }
 async function submitMatch() {
-  if (form.subject === undefined) return ElMessage.warning('请选择匹配科目')
+  if (!form.subjects.length) return ElMessage.warning('请至少选择一个匹配科目')
   if (!meRole.value) return
   submitting.value = true
   try {
-    await createOrder(canResume.value ? 'resume' : 'trial', meRole.value, auth.userId!, id, form.subject, form.hourlyWage)
+    await createOrder(canResume.value ? 'resume' : 'trial', meRole.value, auth.userId!, id, encodeSubjects(form.subjects), form.hourlyWage)
     ElMessage.success(canResume.value ? '简历已投递' : '免费试课邀请已发起')
     dlg.value = false
     router.push('/orders')
@@ -136,8 +137,8 @@ function back() {
     <!-- 发起匹配弹窗 -->
     <el-dialog v-model="dlg" :title="canResume ? '投递简历' : '免费试课'" width="640px">
       <el-form label-position="top">
-        <el-form-item :label="'匹配科目（' + profile?.nickname + ' 所需/可授）'">
-          <el-select v-model="form.subject" placeholder="选择科目" style="width: 100%">
+        <el-form-item :label="'匹配科目（可多选，' + profile?.nickname + ' 所需/可授）'">
+          <el-select v-model="form.subjects" multiple placeholder="选择一个或多个科目" style="width: 100%">
             <el-option v-for="(s, i) in SUBJECTS" :key="s" :label="s" :value="i" />
           </el-select>
         </el-form-item>

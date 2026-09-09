@@ -58,7 +58,6 @@ function fillDemo(r: 'student' | 'teacher') {
       </el-form>
       <div class="foot">
         <span>还没有账号？<router-link to="/register">立即入驻</router-link></span>
-        <router-link to="/admin" class="admin-link">管理员入口</router-link>
       </div>
       <el-divider><span style="font-size: 12px; color: #a0a8b8">演示账号（点选自动填入）</span></el-divider>
       <div class="demos">
@@ -95,14 +94,9 @@ function fillDemo(r: 'student' | 'teacher') {
   width: 100%;
 }
 .foot {
-  display: flex;
-  justify-content: space-between;
   margin-top: 14px;
   font-size: 13px;
   color: #606266;
-}
-.admin-link {
-  color: #a0a8b8;
 }
 .demos {
   display: flex;

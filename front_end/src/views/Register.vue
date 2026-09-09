@@ -28,7 +28,7 @@ const form = reactive({
 const captchaOk = ref(false)
 
 const gradeOptions = computed(() => (role.value === 'teacher' ? TEACHER_GRADE_LEVELS : GRADE_LEVELS))
-const gradeLabelText = computed(() => (role.value === 'teacher' ? '可授年级（大学生及以上）' : '就读 / 求学年级'))
+const gradeLabelText = computed(() => (role.value === 'teacher' ? '本人年级（在读大学生 / 已毕业）' : '就读 / 求学年级'))
 
 const rules = reactive<FormRules>({
   nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
@@ -112,7 +112,7 @@ function onSubjectChange(v: number[]) {
           </el-col>
           <el-col :span="12">
             <el-form-item label="年龄" prop="age">
-              <el-input-number v-model="form.age" :min="6" :max="90" :controls="false" placeholder="选填" style="width: 100%" />
+              <el-input-number v-model="form.age" :min="1" :max="99" :controls="false" placeholder="选填" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>

@@ -4,13 +4,19 @@
 // 当前实现返回 mock。切换真实后端仅需替换本文件函数体。
 // ============================================================================
 import type { LoginPayload, LoginResult, RegisterPayload } from '@/types'
-import { mockLogin } from '@/data/mock'
+import { mockAdminLogin, mockLogin } from '@/data/mock'
 import { register as mockRegister } from '@/data/mockApi'
 
-/** 登录（学生/教师/管理员）。角色由前端登录页 tab 选择。 */
+/** 登录（学生/教师）。角色由前端登录页 tab 选择。 */
 export async function login(p: LoginPayload): Promise<LoginResult> {
   // TODO(real): return http.post('/auth/login', p)
   return mockLogin(p)
+}
+
+/** 管理员登录（独立通道，与管理门户的 login 完全分离）。 */
+export async function adminLogin(account: string, password: string): Promise<LoginResult> {
+  // TODO(real): return http.post('/auth/admin/login', { account, password })
+  return mockAdminLogin(account, password)
 }
 
 /** 注册入驻（学生/教师），提交后进入管理员审核队列。 */

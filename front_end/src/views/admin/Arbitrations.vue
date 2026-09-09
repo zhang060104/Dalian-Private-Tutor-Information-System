@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Role } from '@/types'
 import { listPendingRequests, resolveArbitration, getOrderParties, type RequestView } from '@/api/admin'
 
+const router = useRouter()
 const items = ref<RequestView[]>([])
 type ArbReq = RequestView & { kind: 'arbitration' }
 const arbs = () => items.value.filter((i) => i.kind === 'arbitration') as ArbReq[]
@@ -15,6 +17,9 @@ onMounted(refresh)
 
 function parties(o: ArbReq) {
   return getOrderParties(o.orderId)
+}
+function openOrder(o: ArbReq) {
+  router.push(`/admin/order/${o.orderId}`)
 }
 
 function resolve(o: ArbReq, role: Role, userId: number, delta: number) {
@@ -38,7 +43,7 @@ function resolve(o: ArbReq, role: Role, userId: number, delta: number) {
     <el-card v-for="o in arbs()" :key="o.id" shadow="never" class="arb">
       <div class="head">
         <el-tag type="danger" effect="plain">毁约仲裁</el-tag>
-        <span>订单 #{{ o.orderId }}</span>
+        <el-link type="primary" :underline="false" @click="openOrder(o)">订单 #{{ o.orderId }}</el-link>
         <span class="muted">由{{ o.initiatorRole === 'teacher' ? '教师' : '学生' }}提起</span>
       </div>
       <div class="text">{{ o.text || '（未填写描述）' }}</div>
@@ -48,6 +53,7 @@ function resolve(o: ArbReq, role: Role, userId: number, delta: number) {
         <span>学生：{{ parties(o)!.studentName }}（#{{ parties(o)!.student_id }}）</span>
       </div>
       <div class="ops">
+        <el-button size="small" @click="openOrder(o)">查看订单详情</el-button>
         <el-button size="small" type="primary" @click="parties(o) && resolve(o, 'teacher', parties(o)!.teacher_id, -10)">裁定教师违约 -10</el-button>
         <el-button size="small" type="primary" plain @click="parties(o) && resolve(o, 'student', parties(o)!.student_id, -10)">裁定学生违约 -10</el-button>
         <el-button size="small" type="success" plain @click="parties(o) && resolve(o, 'teacher', parties(o)!.teacher_id, 0)">双方无责结案</el-button>

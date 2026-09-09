@@ -29,6 +29,9 @@ const router = createRouter({
       children: [
         { path: '', name: 'admin-login', component: () => import('@/views/admin/AdminLogin.vue'), meta: { title: '管理员登录', adminPublic: true } },
         { path: 'dashboard', name: 'admin-dashboard', component: () => import('@/views/admin/Dashboard.vue'), meta: { title: '后台概览', admin: true } },
+        { path: 'orders', name: 'admin-orders', component: () => import('@/views/admin/Orders.vue'), meta: { title: '全部订单', admin: true } },
+        { path: 'order/:id', name: 'admin-order-detail', component: () => import('@/views/admin/OrderAdminDetail.vue'), meta: { title: '订单详情', admin: true } },
+        { path: 'user/:role/:id', name: 'admin-user-archive', component: () => import('@/views/admin/UserArchive.vue'), meta: { title: '用户档案', admin: true } },
         { path: 'users', name: 'admin-users', component: () => import('@/views/admin/UserAudit.vue'), meta: { title: '注册与资料审核', admin: true } },
         { path: 'payments', name: 'admin-payments', component: () => import('@/views/admin/Payments.vue'), meta: { title: '缴费核验', admin: true } },
         { path: 'arbitrations', name: 'admin-arbitrations', component: () => import('@/views/admin/Arbitrations.vue'), meta: { title: '毁约仲裁', admin: true } },
@@ -45,15 +48,21 @@ const ADMIN_HOME = '/admin/dashboard'
 router.beforeEach((to) => {
   const auth = useAuthStore()
   const cur: Role | null = auth.role
+  const isAdminArea = to.path === '/admin' || to.path.startsWith('/admin/')
 
-  // admin 后台：登录页 public；其余需 admin 角色
-  if (to.meta.admin) {
-    if (cur !== 'admin') return { name: 'admin-login', query: { redirect: to.fullPath } }
-    return true
+  // ===== 管理后台区域：独立处理，绝不与门户跳转规则混用 =====
+  if (isAdminArea) {
+    // 管理员登录页（/admin）对所有人公开放行
+    if (to.meta.adminPublic) return true
+    // 其余后台子页需 admin 角色
+    if (cur === 'admin') return true
+    // 已登录的普通用户/游客访问受保护子页：回 /admin 登录页
+    return { name: 'admin-login', query: { redirect: to.fullPath } }
   }
+
+  // ===== 门户区域 =====
   // admin 已登录时访问门户页：送回后台
   if (cur === 'admin') return { path: ADMIN_HOME }
-
   // 门户公开页放行
   if (to.meta.public) {
     // 已登录访问 login/register → 去工作台

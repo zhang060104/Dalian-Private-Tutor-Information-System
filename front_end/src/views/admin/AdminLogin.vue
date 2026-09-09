@@ -8,12 +8,13 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const formRef = ref<FormInstance>()
-const form = reactive({ phone: '', password: '' })
+const form = reactive({ account: '', password: '' })
 
 async function submit() {
   await formRef.value?.validate()
   try {
-    await auth.login({ role: 'admin', phone: form.phone, password: form.password })
+    // 走独立的管理员认证通道（loginAdmin），不复用门户的学生/教师登录
+    await auth.loginAdmin(form.account, form.password)
     ElMessage.success('欢迎回来')
     router.push((route.query.redirect as string) || '/admin/dashboard')
   } catch (e) {
@@ -28,8 +29,8 @@ async function submit() {
       <div class="brand">家教中心 · 管理后台</div>
       <div class="sub muted">仅限平台管理员使用</div>
       <el-form ref="formRef" :model="form" label-position="top" size="large">
-        <el-form-item label="账号" prop="phone" :rules="[{ required: true, message: '请输入账号', trigger: 'blur' }]">
-          <el-input v-model="form.phone" placeholder="管理员手机号 / 昵称" />
+        <el-form-item label="账号" prop="account" :rules="[{ required: true, message: '请输入账号', trigger: 'blur' }]">
+          <el-input v-model="form.account" placeholder="管理员账号 / 手机号" />
         </el-form-item>
         <el-form-item label="密码" prop="password" :rules="[{ required: true, message: '请输入密码', trigger: 'blur' }]">
           <el-input v-model="form.password" type="password" show-password placeholder="密码" @keyup.enter="submit" />

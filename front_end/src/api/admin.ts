@@ -5,6 +5,8 @@
 import type { Profile, RegisterPayload, Role } from '@/types'
 import { getDb } from '@/data/mock'
 import * as M from '@/data/mockApi'
+import { decodeSubjects } from '@/utils/subject'
+import { orderStatus } from '@/utils/order'
 
 /** 管理端待办的可读视图 */
 export type RequestView =
@@ -86,4 +88,108 @@ export function getOrderParties(orderId: number): { student_id: number; teacher_
   const stu = d.students.find((s) => s.id === o.student_id)
   const tea = d.teachers.find((t) => t.id === o.teacher_id)
   return { student_id: o.student_id, teacher_id: o.teacher_id, studentName: stu?.nickname ?? '学生#' + o.student_id, teacherName: tea?.nickname ?? '教师#' + o.teacher_id }
+}
+
+// ---------------------- 全部订单（后台只读概览） ----------------------
+
+/** 后台订单列表行视图：已翻译状态为中文文案 */
+export interface AdminOrderRow {
+  id: number
+  studentName: string
+  teacherName: string
+  /** 状态数值（0-12，业务判定用） */
+  status: number
+  /** 状态中文名（orderStatus().name，供直接展示） */
+  statusName: string
+  /** 所属业务阶段中文（概览归属，如 缴费/授课） */
+  stageName: string
+  subjectsText: string
+  hourly_wage: number
+  createdAt: string
+}
+
+/** 业务阶段 → 中文归属（后台列表分组用） */
+const STAGE_CN: Record<string, string> = {
+  resume: '匹配', confirm: '信息确认', payment: '费用缴纳', trial: '试课', active: '授课服务', closing: '结单', closed: '已结束', dispute: '仲裁',
+}
+
+type DbOrder = import('@/types').Order
+
+/** 把订单列表映射为后台行视图（含双方昵称、状态中文），供全部订单 / 按用户历史订单复用 */
+function toAdminRows(d: ReturnType<typeof getDb>, orders: DbOrder[]): AdminOrderRow[] {
+  const nameOf = (role: 'student' | 'teacher', id: number) =>
+    (role === 'student' ? d.students.find((s) => s.id === id) : d.teachers.find((t) => t.id === id))?.nickname ?? `#${id}`
+  return [...orders]
+    .sort((a, b) => (a.id > b.id ? -1 : 1))
+    .map((o) => {
+      const st = orderStatus(o.status)
+      return {
+        id: o.id,
+        studentName: nameOf('student', o.student_id),
+        teacherName: nameOf('teacher', o.teacher_id),
+        status: o.status,
+        statusName: st.name,
+        stageName: STAGE_CN[st.stage] ?? '其他',
+        subjectsText: decodeSubjects(o.subject).join('、') || '—',
+        hourly_wage: o.hourly_wage,
+        createdAt: o.createdAt,
+      }
+    })
+}
+
+/** 全部订单（管理后台全量一览，含进行中与已结束） */
+export function listAllOrders(): AdminOrderRow[] {
+  return toAdminRows(getDb(), getDb().orders)
+}
+
+/** 某位用户参与的全部订单（含历史/进行中），供后台档案页查看个人订单足迹 */
+export function listOrdersForUserAdmin(role: 'student' | 'teacher', userId: number): AdminOrderRow[] {
+  const d = getDb()
+  const mine = d.orders.filter((o) => (role === 'student' ? o.student_id === userId : o.teacher_id === userId))
+  return toAdminRows(d, mine)
+}
+
+/** 后台读取某用户公开资料（不含联系方式等私密字段） */
+export function getUserAdmin(role: 'student' | 'teacher', userId: number): Profile | null {
+  const u = M.rawUser(role, userId)
+  return u ? M.toProfile(u, false) : null
+}
+
+/** 后台只读订单详情（含双方与完整缴费核验标记），供管理员查看，无操作按钮 */
+export function getOrderAdmin(orderId: number): {
+  id: number
+  studentName: string
+  teacherName: string
+  status: number
+  statusName: string
+  statusDesc: string
+  subjectsText: string
+  hourly_wage: number
+  infoFee: number
+  description: string
+  verification: number
+  createdAt: string
+  timeTables: [number, number, number, number, number, number, number]
+} | null {
+  const d = getDb()
+  const o = d.orders.find((x) => x.id === orderId)
+  if (!o) return null
+  const stu = d.students.find((s) => s.id === o.student_id)
+  const tea = d.teachers.find((t) => t.id === o.teacher_id)
+  const st = orderStatus(o.status)
+  return {
+    id: o.id,
+    studentName: stu?.nickname ?? '学生#' + o.student_id,
+    teacherName: tea?.nickname ?? '教师#' + o.teacher_id,
+    status: o.status,
+    statusName: st.name,
+    statusDesc: st.desc,
+    subjectsText: decodeSubjects(o.subject).join('、') || '—',
+    hourly_wage: o.hourly_wage,
+    infoFee: o.infoFee || o.hourly_wage * 2,
+    description: o.description,
+    verification: o.verification,
+    createdAt: o.createdAt,
+    timeTables: o.timeTables,
+  }
 }
