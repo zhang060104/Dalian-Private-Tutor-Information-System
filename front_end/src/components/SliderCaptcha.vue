@@ -5,10 +5,12 @@
  *  - 用户拖动拼块到背景缺口处松手 → POST /api/captcha/verify {captchaId, x}
  *    → 通过返回 {token}（5 分钟内有效、可重复使用）
  *
- * 缺口垂直 y 通过 canvas 扫描白色描边矩形定位（CaptchaVO 不返回 y）。
+ * 缺口定位：CaptchaVO 不返回坐标。但缺口轮廓在图上是一条封闭白描边，
+ * 只需对整幅图做一次线性扫描，统计所有白色像素的包围盒即可得缺口左上角 (x,y)。
+ * 复杂度 O(W*H)（约 4.5 万像素，亚毫秒），不做逐像素模板匹配，不拖慢效率。
  * emit('success', token) 通知父组件持有 token，业务请求时携带 captchaToken。
  */
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 
@@ -19,9 +21,16 @@ const emit = defineEmits<{
 
 const props = defineProps<{ hint?: string }>()
 
+// ============ 坐标系约定（关键） ============
+// 逻辑坐标一律使用「背景像素」（后端 300x150 图，缺口 SIZE=48），
+// 即 puzzleLeft/puzzleTop/holeX/holeY/拖动范围 全部是 300 系背景像素。
+// 显示层通过 scale = displayW / BG_W 统一换算成 CSS px，
+// 任何地方都不再出现"显示像素混入逻辑计算"。
 const BG_W = 300
 const BG_H = 150
 const SIZE = 48
+/** 拼块可移动范围（背景像素）：0 .. BG_W-SIZE */
+const TRACK_MAX = BG_W - SIZE
 
 interface CaptchaVO {
   captchaId: string
@@ -34,11 +43,11 @@ const backgroundImg = ref<string>('')
 const puzzleImg = ref<string>('')
 const holeX = ref(0)
 const holeY = ref(0)
-const puzzleLeft = ref(0)
-const puzzleTop = ref(0)
-const displayW = ref(BG_W)
-const puzzleDispW = ref(SIZE) // 拼块显示宽度（px）
-const trackWidth = ref(BG_W - SIZE)
+const puzzleLeft = ref(0) // 背景像素
+const puzzleTop = ref(0) // 背景像素
+const displayW = ref(BG_W) // 容器实际显示宽度（仅用于算 scale）
+const scale = computed(() => displayW.value / BG_W)
+const puzzleDispW = computed(() => Math.round(SIZE * scale.value))
 
 const done = ref(false)
 const dragging = ref(false)
@@ -68,7 +77,7 @@ async function fetchCaptcha() {
   }
 }
 
-/** 在 background 图上扫描白色描边矩形（48×48）确定缺口左上 (x,y) */
+/** 在 background 图上做一次线性扫描：统计白色像素（缺口白描边）包围盒 → 缺口左上角 (x,y) */
 async function detectHole(bgDataUrl: string) {
   const img = new Image()
   await new Promise<void>((resolve, reject) => {
@@ -83,57 +92,47 @@ async function detectHole(bgDataUrl: string) {
   ctx.drawImage(img, 0, 0, BG_W, BG_H)
   const data = ctx.getImageData(0, 0, BG_W, BG_H).data
 
-  const isWhite = (i: number) => data[i] >= 250 && data[i + 1] >= 250 && data[i + 2] >= 250
-
-  // 在所有候选位置中找白色描边得分最高的 48×48 矩形
-  let best = { score: -1, x: 0, y: 0 }
-  for (let y = 0; y <= BG_H - SIZE; y++) {
-    for (let x = 0; x <= BG_W - SIZE; x++) {
-      let score = 0
-      for (let dx = 0; dx < SIZE; dx++) {
-        const top = (y * BG_W + x + dx) * 4
-        const bot = ((y + SIZE - 1) * BG_W + x + dx) * 4
-        if (isWhite(top)) score++
-        if (isWhite(bot)) score++
-      }
-      for (let dy = 0; dy < SIZE; dy++) {
-        const left = ((y + dy) * BG_W + x) * 4
-        const right = ((y + dy) * BG_W + x + SIZE - 1) * 4
-        if (isWhite(left)) score++
-        if (isWhite(right)) score++
-      }
-      if (score > best.score) best = { score, x, y }
+  // 白描边是 Color.WHITE(255)，实线 alpha=255；干扰线/色块远达不到纯白。
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -1
+  let maxY = -1
+  let cnt = 0
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] >= 250 && data[i + 1] >= 250 && data[i + 2] >= 250 && data[i + 3] >= 250) {
+      const px = (i / 4) % BG_W
+      const py = Math.floor(i / 4 / BG_W)
+      if (px < minX) minX = px
+      if (px > maxX) maxX = px
+      if (py < minY) minY = py
+      if (py > maxY) maxY = py
+      cnt++
     }
   }
 
-  if (best.score >= 150) {
-    holeX.value = best.x
-    holeY.value = best.y
-  } else {
-    holeX.value = 0
-    holeY.value = Math.floor((BG_H - SIZE) / 2)
-  }
+  // 描边矩形高≈48、点数充足才算检测成功；否则回退到中段随机（尽量命中后端 y∈[30,92] 中段）。
+  const ok = cnt >= 100 && maxY - minY >= SIZE - 20
+  holeX.value = ok ? minX : Math.floor((BG_W - SIZE) * (0.5 + Math.random() * 0.1))
+  holeY.value = ok ? minY : Math.floor((BG_H - SIZE) / 2)
 }
 
-function onResize() {
+function measure() {
+  // 容器实际显示宽度 → 只用于算 scale；逻辑坐标永远是 300 系背景像素
   if (!bgWrapEl.value) return
-  displayW.value = bgWrapEl.value.clientWidth
-  puzzleDispW.value = Math.round((SIZE * displayW.value) / BG_W)
-  trackWidth.value = Math.max(0, displayW.value - puzzleDispW.value)
-  // 已成功则保留，否则按比例缩放当前 left
-  puzzleLeft.value = Math.min(puzzleLeft.value, trackWidth.value)
+  const w = bgWrapEl.value.clientWidth
+  displayW.value = w > 0 ? w : BG_W
 }
 
 function onPointerDown(e: PointerEvent) {
   if (done.value || loading.value || !captchaId.value) return
   dragging.value = true
   startX = e.clientX
-  startLeft = puzzleLeft.value
+  startLeft = puzzleLeft.value // 背景像素
   pointerMoveHandler = (ev: PointerEvent) => {
     if (!dragging.value) return
-    const scale = displayW.value / BG_W
-    let nx = startLeft + (ev.clientX - startX) / scale
-    nx = Math.max(0, Math.min(trackWidth.value, nx))
+    // 鼠标位移 ÷ scale 换算回背景像素，再 clamp 到 [0, TRACK_MAX]
+    let nx = startLeft + (ev.clientX - startX) / scale.value
+    nx = Math.max(0, Math.min(TRACK_MAX, nx))
     puzzleLeft.value = nx
   }
   pointerUpHandler = () => {
@@ -156,6 +155,7 @@ function detach() {
 
 async function submitVerify() {
   if (done.value || !captchaId.value) return
+  // puzzleLeft 已是背景像素坐标，直接取整提交；后端容差 ±6px
   const x = Math.round(puzzleLeft.value)
   try {
     const res = await http.post<{ token: string }>('/api/captcha/verify', {
@@ -173,13 +173,15 @@ async function submitVerify() {
 
 defineExpose({ refresh: fetchCaptcha })
 
-onMounted(() => {
+onMounted(async () => {
+  await nextTick()
+  measure()
+  window.addEventListener('resize', measure)
   fetchCaptcha()
-  window.addEventListener('resize', onResize)
 })
 onBeforeUnmount(() => {
   detach()
-  window.removeEventListener('resize', onResize)
+  window.removeEventListener('resize', measure)
 })
 </script>
 
@@ -195,8 +197,8 @@ onBeforeUnmount(() => {
         :style="{
           width: puzzleDispW + 'px',
           height: puzzleDispW + 'px',
-          left: (puzzleLeft * displayW) / BG_W + 'px',
-          top: (puzzleTop * displayW) / BG_W + 'px',
+          left: Math.round(puzzleLeft * scale) + 'px',
+          top: Math.round(puzzleTop * scale) + 'px',
         }"
         @pointerdown="onPointerDown"
       />
@@ -204,7 +206,7 @@ onBeforeUnmount(() => {
     </div>
     <div class="actions">
       <div class="track">
-        <div class="fill" :style="{ width: ((puzzleLeft / Math.max(1, trackWidth)) * 100) + '%' }"></div>
+        <div class="fill" :style="{ width: Math.round((puzzleLeft / TRACK_MAX) * 100) + '%' }"></div>
         <span v-if="!done && !dragging" class="tip">{{ props.hint ?? '拖动拼块到缺口对齐后松开' }}</span>
         <span v-else-if="done" class="ok">✓ 验证通过</span>
         <span v-else class="tip">释放即提交</span>

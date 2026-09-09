@@ -11,7 +11,6 @@ export interface ApiEnvelope<T> {
 const TOKEN_KEY = 'dl_tutor_token'
 
 const rawHttp = axios.create({
-  baseURL: '/api',
   timeout: 15000,
 })
 

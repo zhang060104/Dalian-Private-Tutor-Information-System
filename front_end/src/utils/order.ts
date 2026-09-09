@@ -38,8 +38,10 @@ export function isActiveOrder(o: Order): boolean {
 
 /** 我侧当前能执行的操作名，交给页面决定按钮（按我扮演学生或教师） */
 export interface MyActions {
-  /** 主推进按钮文字，如「确认简历」「同意订单」 */
+  /** 主推进按钮文字，如「确认简历」「同意订单」（仅当轮到我可操作时给出） */
   primary?: string
+  /** 轮到对方操作时的等待提示（非错误，仅展示） */
+  waiting?: string
   /** 可申请修改订单信息（仅处于信息确认互审阶段） */
   canEditInfo: boolean
   /** 需我缴费（作为缴纳方且处于该缴费子项） */
@@ -60,7 +62,7 @@ export interface MyActions {
   contactVisible: boolean
   /** 是否已结束 */
   closed: boolean
-  /** 可取消/打回（回到 12） */
+  /** 可取消/打回（0/1 撤回删除；2~8 取消并结束） */
   canCancel: boolean
 }
 
@@ -93,63 +95,59 @@ export function myActions(o: Order, myRole: 'student' | 'teacher'): MyActions {
     canArbitrate: false,
     contactVisible: s >= 6, // 缴费核验完成(status6)后可见联系方式
     closed: s === 12,
-    canCancel: false,
+    canCancel: s >= 0 && s <= 8, // 后端 cancel：0/1 撤回删除、2~8 取消结束、9+ 禁直接取消
   }
 
   switch (s) {
-    case 0: // 教师投递，等学生
+    case 0: // 教师投递，等学生确认
       if (meIsStudent) base.primary = '确认接受简历'
-      else base.primary = '等待学生确认'
+      else base.waiting = '等待学生确认是否接受'
       break
-    case 1: // 学生发起，等教师
+    case 1: // 学生发起，等教师确认
       if (!meIsStudent) base.primary = '接受授课'
-      else base.primary = '等待教师确认'
+      else base.waiting = '等待教师确认是否接受'
       break
-    case 2: // 双方确认，进信息确认
+    case 2: // 双方确认，进信息确认（都可提交或取消）
       base.canEditInfo = true
-      base.canCancel = true
       break
-    case 3: // 学生改了单等教师
+    case 3: // 学生提交了新明细，等教师审
       if (!meIsStudent) {
         base.primary = '确认订单信息'
-        base.canEditInfo = true // 教师可再改
-        base.canCancel = true
-      } else base.primary = '等待教师审核'
+        base.canEditInfo = true // 教师也可再改
+      } else base.waiting = '等待教师审核（你修改的订单信息）'
       break
-    case 4: // 教师改了单等学生
+    case 4: // 教师提交了新明细，等学生审
       if (meIsStudent) {
         base.primary = '确认订单信息'
         base.canEditInfo = true
-        base.canCancel = true
-      } else base.primary = '等待学生审核'
+      } else base.waiting = '等待学生审核（你修改的订单信息）'
       break
     case 5: // 缴费中
       base.needDeposit = true
       base.canPay = !myDepositPaid || (!meIsStudent && !infoFeePaid)
-      base.canCancel = true
       break
-    case 6: // 试课
+    case 6: // 试课进行中：任一方点通过（7/8 状态会提示对方确认）
       base.canPassTrial = true
       break
-    case 7: // 学生过试课，等教师
+    case 7: // 学生已过试课，等教师确认
       if (!meIsStudent) base.primary = '确认试课通过'
-      else base.primary = '等待教师确认试课'
+      else base.waiting = '等待教师确认试课'
       break
-    case 8: // 教师过试课，等学生
+    case 8: // 教师已过试课，等学生确认
       if (meIsStudent) base.primary = '确认试课通过'
-      else base.primary = '等待学生确认试课'
+      else base.waiting = '等待学生确认试课'
       break
     case 9: // 授课中
       base.canClose = true
       base.canArbitrate = true
       break
-    case 10: // 教师请求结单
+    case 10: // 教师请求结单，等学生同意
       if (meIsStudent) base.primary = '同意结单'
-      else base.primary = '等待学生同意结单'
+      else base.waiting = '等待学生同意结单'
       break
-    case 11: // 学生请求结单
+    case 11: // 学生请求结单，等教师同意
       if (!meIsStudent) base.primary = '同意结单'
-      else base.primary = '等待教师同意结单'
+      else base.waiting = '等待教师同意结单'
       break
     default:
       break

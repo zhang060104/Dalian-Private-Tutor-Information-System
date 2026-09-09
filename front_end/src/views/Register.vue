@@ -60,15 +60,24 @@ const rules = reactive<FormRules>({
   idcard: [{ required: true, message: '请上传身份证人像面', trigger: 'change' }],
 })
 
-/** 真实上传：multipart 到 /api/upload；返回服务端 url */
+/** 真实上传：multipart 到 /api/upload，返回服务端 url。
+ *  注册页为匿名上传：必须带 X-Captcha-Token（滑块验证签发）。
+ *  Content-Type 交由 axios/浏览器自动生成（含 boundary），切勿手写。 */
 async function uploadImage(file: File): Promise<string> {
   const fd = new FormData()
   fd.append('file', file)
-  const res = await http.post<{ url: string }>('/api/upload', fd, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const headers = captchaToken.value ? { 'X-Captcha-Token': captchaToken.value } : undefined
+  const res = await http.post<{ url: string }>('/api/upload', fd, { headers })
   return res.url
 }
+
+// 上传组件实例（用于失败/未验证时清空列表）
+type UploadInst = { clearFiles: () => void } | null
+const upQr = ref<UploadInst>(null)
+const upId = ref<UploadInst>(null)
+const upCert = ref<UploadInst>(null)
+const uploadRefOf = (field: 'qrcode' | 'idcard' | 'certificate') =>
+  field === 'qrcode' ? upQr : field === 'idcard' ? upId : upCert
 
 async function onFile(
   field: 'qrcode' | 'idcard' | 'certificate',
@@ -79,11 +88,18 @@ async function onFile(
     ElMessage.error('请选择有效的图片文件')
     return
   }
+  // 匿名上传必须先完成滑块验证拿到 captchaToken（安全验证项在下方上传区之前）
+  if (!captchaToken.value) {
+    ElMessage.warning('请先完成「安全验证」滑块，再进行图片上传')
+    uploadRefOf(field).value?.clearFiles()
+    return
+  }
   uploading.value[field] = true
   try {
     form[field] = await uploadImage(raw)
   } catch (e) {
-    // http 拦截器已弹错
+    // http 拦截器已弹错；移除列表项避免误以为上传成功
+    uploadRefOf(field).value?.clearFiles()
   } finally {
     uploading.value[field] = false
   }
@@ -232,8 +248,15 @@ function onSubjectChange(v: number[]) {
         </el-form-item>
 
         <el-divider content-position="left">实名与收款凭证</el-divider>
-        <el-form-item label="收款码截图（老师必传 / 学生收款也建议传）" prop="qrcode">
+        <el-form-item label="安全验证（请先完成滑块，再上传图片）">
+          <div style="width: 100%">
+            <SliderCaptcha @success="onCaptcha" @reset="onCaptchaReset" />
+            <div class="muted captcha-tip">图片上传需匿名提交（注册未登录），系统要求先通过滑块验证；验证 5 分钟内有效，可连续上传多张。</div>
+          </div>
+        </el-form-item>
+        <el-form-item label="收款码截图（收款/信息费用）" prop="qrcode">
           <el-upload
+            ref="upQr"
             action="#"
             :auto-upload="false"
             :limit="1"
@@ -249,6 +272,7 @@ function onSubjectChange(v: number[]) {
         </el-form-item>
         <el-form-item label="身份证人像面（实名认证）" prop="idcard">
           <el-upload
+            ref="upId"
             action="#"
             :auto-upload="false"
             :limit="1"
@@ -264,6 +288,7 @@ function onSubjectChange(v: number[]) {
         </el-form-item>
         <el-form-item v-if="role === 'teacher'" label="教师资格 / 资质证明（选填）">
           <el-upload
+            ref="upCert"
             action="#"
             :auto-upload="false"
             :limit="1"
@@ -276,10 +301,6 @@ function onSubjectChange(v: number[]) {
           >
             <el-icon><Plus /></el-icon>
           </el-upload>
-        </el-form-item>
-
-        <el-form-item label="安全验证">
-          <SliderCaptcha @success="onCaptcha" @reset="onCaptchaReset" />
         </el-form-item>
 
         <el-button type="primary" size="large" class="submit" @click="submit">
@@ -308,6 +329,11 @@ function onSubjectChange(v: number[]) {
 }
 .tip {
   margin-bottom: 20px;
+}
+.captcha-tip {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 6px;
 }
 .submit {
   width: 100%;

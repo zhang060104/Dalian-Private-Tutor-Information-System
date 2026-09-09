@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getOrderAdmin, type AdminOrderDetailView } from '@/api/admin'
+import { ElMessage, type UploadUserFile } from 'element-plus'
+import http from '@/api/http'
+import { getOrderAdmin, uploadInfoFeeQr, type AdminOrderDetailView } from '@/api/admin'
 import { timetableSummary } from '@/utils/timetable'
 
 const route = useRoute()
@@ -11,6 +12,7 @@ const oid = Number(route.params.id)
 
 const data = ref<AdminOrderDetailView | null>(null)
 const loading = ref(true)
+const savingQr = ref(false)
 
 function timeText(): string {
   if (!data.value) return ''
@@ -26,6 +28,27 @@ function feeItems(): { label: string; done: boolean }[] {
     { label: '教师信息费', done: (v & 4) === 4 },
   ]
 }
+
+/** 上传信息费收款码（教师据此支付信息费） */
+async function onQrFile(f: UploadUserFile) {
+  const raw = f.raw
+  if (!raw) return
+  savingQr.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', raw)
+    const res = await http.post<{ url: string }>('/api/upload', fd)
+    await uploadInfoFeeQr(oid, res.url)
+    ElMessage.success('收款码已更新（教师端缴费页即时可见）')
+    const v = await getOrderAdmin(oid)
+    if (v) data.value = v
+  } catch {
+    /* http 已弹错 */
+  } finally {
+    savingQr.value = false
+  }
+}
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -81,9 +104,9 @@ onMounted(async () => {
         </div>
       </el-card>
 
-      <el-card v-if="data.teaDepositImg || data.stuDepositImg || data.infoFeeImg || data.infoFeeQr" shadow="never">
+      <el-card shadow="never">
         <template #header>凭证与收款码</template>
-        <div class="imgs">
+        <div v-if="data.teaDepositImg || data.stuDepositImg || data.infoFeeImg || data.infoFeeQr" class="imgs">
           <div v-if="data.teaDepositImg" class="im">
             <div class="lbl">教师定金凭证</div>
             <el-image :src="data.teaDepositImg" :preview-src-list="[data.teaDepositImg]" fit="contain" style="max-height: 160px" />
@@ -100,6 +123,13 @@ onMounted(async () => {
             <div class="lbl">信息费收款码</div>
             <el-image :src="data.infoFeeQr" :preview-src-list="[data.infoFeeQr]" fit="contain" style="max-height: 160px" />
           </div>
+        </div>
+        <div class="qr-upload">
+          <el-upload action="#" :auto-upload="false" :show-file-list="false" accept="image/*" :on-change="onQrFile">
+            <el-button size="small" type="primary" plain :loading="savingQr">
+              {{ data.infoFeeQr ? '更换信息费收款码' : '上传信息费收款码（教师据此缴费）' }}
+            </el-button>
+          </el-upload>
         </div>
       </el-card>
     </template>
@@ -143,6 +173,11 @@ onMounted(async () => {
 .lbl {
   font-size: 12px;
   color: #909399;
+}
+.qr-upload {
+  margin-top: 14px;
+  border-top: 1px dashed #eef1f6;
+  padding-top: 14px;
 }
 .muted {
   color: #909399;

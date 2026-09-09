@@ -4,6 +4,7 @@
 import http from './http'
 import type { Role } from '@/types'
 import { decodeSubjects as decodeSubjectsUtil } from '@/utils/subject'
+import { ORDER_STATUS } from '@/utils/order'
 
 /** 统计 */
 export interface StatsDTO {
@@ -23,9 +24,16 @@ export interface RequestDTO {
   type: RequestType
   typeName: string
   tarId?: number
-  payload: Record<string, unknown>
-  createdAt: string
   adminId: number
+  createdAt: string
+  /** 后端已把 json 解析为对象下发；type 0/1 形如 {kind,name,fields?,profile:{...},submittedAt} */
+  payload: Record<string, unknown>
+  /** 后端仅 type 0/1 附带（账号昵称/手机号） */
+  targetName?: string | null
+  targetPhone?: string | null
+  /** 后端仅 type 2..5 附带（关联订单） */
+  orderId?: number
+  orderStatus?: number
 }
 export async function listRequests(opts?: {
   type?: RequestType
@@ -64,24 +72,40 @@ export interface AdminOrderRow {
   infoFee?: number
   description?: string
   createdAt: string
+  /** 后端原行（含凭证图/时间表/双方手机号，后台详情页直接取用） */
+  raw: AdminOrderRawDTO
 }
 
+/** GET /api/admin/orders 返回的行（全字段，可直接支撑后台详情页） */
 interface AdminOrderRawDTO {
   id: number
   studentId: number
   studentName: string
-  studentPhone?: string
+  studentPhone?: string | null
   teacherId: number
   teacherName: string
-  teacherPhone?: string
+  teacherPhone?: string | null
+  studentCredit?: number
+  teacherCredit?: number
   subject: number
   hourlyWage: number
   status: number
-  description?: string
+  description?: string | null
   verification: number
-  infoFee?: number
+  infoFee?: number | null
   createdAt: string
-  statusName: string
+  updatedAt?: string | null
+  depositImgTea?: string | null
+  depositImgStu?: string | null
+  infoFeeImg?: string | null
+  infoFeeQr?: string | null
+  timeTable1?: number
+  timeTable2?: number
+  timeTable3?: number
+  timeTable4?: number
+  timeTable5?: number
+  timeTable6?: number
+  timeTable7?: number
 }
 
 const STAGE_CN: Record<string, string> = {
@@ -106,44 +130,39 @@ function stageOf(status: number): string {
   return 'resume'
 }
 
-// 用动态 import 避免 orderStatus 循环依赖
-async function translateStatus(status: number): Promise<string> {
-  try {
-    const mod = await import('@/utils/order')
-    return mod.orderStatus(status).name
-  } catch {
-    return `状态 ${status}`
-  }
+function statusNameOf(status: number): string {
+  return ORDER_STATUS.find((s) => s.value === status)?.name ?? `状态 ${status}`
+}
+function statusDescOf(status: number): string {
+  return ORDER_STATUS.find((s) => s.value === status)?.desc ?? ''
 }
 
-/** 全部订单（管理后台全量一览） */
+/** 全部订单（管理后台全量一览，行内已含凭证图/时间表/双方手机号/信用分） */
 export async function listAllOrders(): Promise<AdminOrderRow[]> {
   const arr = await http.get<AdminOrderRawDTO[]>('/api/admin/orders')
-  const out: AdminOrderRow[] = []
-  for (const o of arr) {
-    out.push({
-      id: o.id,
-      studentId: o.studentId,
-      teacherId: o.teacherId,
-      studentName: o.studentName,
-      teacherName: o.teacherName,
-      studentCredit: 100,
-      teacherCredit: 100,
-      subject: o.subject,
-      subjectsText: decodeSubjectsLocal(o.subject).join('、') || '—',
-      status: o.status,
-      statusName: o.statusName || (await translateStatus(o.status)),
-      stageName: STAGE_CN[stageOf(o.status)] ?? '其他',
-      hourlyWage: o.hourlyWage,
-      infoFee: o.infoFee,
-      description: o.description,
-      createdAt: o.createdAt,
-    })
-  }
+  const out: AdminOrderRow[] = arr.map((o) => ({
+    id: o.id,
+    studentId: o.studentId,
+    teacherId: o.teacherId,
+    studentName: o.studentName,
+    teacherName: o.teacherName,
+    studentCredit: o.studentCredit ?? 100,
+    teacherCredit: o.teacherCredit ?? 100,
+    subject: o.subject,
+    subjectsText: decodeSubjectsLocal(o.subject).join('、') || '—',
+    status: o.status,
+    statusName: statusNameOf(o.status),
+    stageName: STAGE_CN[stageOf(o.status)] ?? '其他',
+    hourlyWage: o.hourlyWage,
+    infoFee: o.infoFee ?? 0,
+    description: o.description ?? '',
+    createdAt: o.createdAt,
+    raw: o,
+  }))
   return out.sort((a, b) => (a.id > b.id ? -1 : 1))
 }
 
-/** 某订单的后台视图（供 OrderAdminDetail / UserArchive） */
+/** 某订单的后台视图（供 OrderAdminDetail / UserArchive；后端无单查接口，直接由列表行组装） */
 export interface AdminOrderDetailView {
   id: number
   studentId: number
@@ -171,112 +190,82 @@ export interface AdminOrderDetailView {
   createdAt: string
 }
 
-export async function getOrderAdmin(orderId: number): Promise<AdminOrderDetailView> {
-  const arr = await http.get<AdminOrderRawDTO[]>('/api/admin/orders')
-  const o = arr.find((x) => x.id === orderId)
-  if (!o) throw new Error('订单不存在')
-  // 详情需补充 teaDepositImg 等（管理后台详细 DTO）—— 走另一个 admin 详情接口
-  const detail = await http
-    .get<{
-      studentId: number
-      teacherId: number
-      studentName: string
-      teacherName: string
-      studentPhone?: string
-      teacherPhone?: string
-      studentCredit?: number
-      teacherCredit?: number
-      subject: number
-      subjectsText?: string
-      status: number
-      hourlyWage: number
-      infoFee?: number
-      description?: string
-      verification: number
-      teaDepositImg?: string
-      stuDepositImg?: string
-      infoFeeImg?: string
-      infoFeeQr?: string
-      timeTable1: number
-      timeTable2: number
-      timeTable3: number
-      timeTable4: number
-      timeTable5: number
-      timeTable6: number
-      timeTable7: number
-      createdAt: string
-    }>(`/api/admin/orders/${orderId}`)
-    .catch(() => null)
-
-  const statusName = o.statusName || (await translateStatus(o.status))
-  const statusDesc = (await import('@/utils/order')).orderStatus(o.status).desc
-  if (!detail) {
-    return {
-      id: o.id,
-      studentId: o.studentId,
-      teacherId: o.teacherId,
-      studentName: o.studentName,
-      teacherName: o.teacherName,
-      studentCredit: 100,
-      teacherCredit: 100,
-      subject: o.subject,
-      subjectsText: decodeSubjectsLocal(o.subject).join('、') || '—',
-      status: o.status,
-      statusName,
-      statusDesc,
-      hourlyWage: o.hourlyWage,
-      infoFee: o.infoFee ?? 0,
-      description: o.description ?? '',
-      verification: o.verification,
-      timeTables: [0, 0, 0, 0, 0, 0, 0],
-      createdAt: o.createdAt,
-    }
-  }
+export async function getOrderAdmin(orderId: number): Promise<AdminOrderDetailView | null> {
+  const all = await listAllOrders()
+  const row = all.find((x) => x.id === orderId)
+  if (!row) return null
+  const o = row.raw
   return {
     id: o.id,
-    studentId: detail.studentId,
-    teacherId: detail.teacherId,
-    studentName: detail.studentName,
-    teacherName: detail.teacherName,
-    studentCredit: detail.studentCredit ?? 100,
-    teacherCredit: detail.teacherCredit ?? 100,
-    studentPhone: detail.studentPhone,
-    teacherPhone: detail.teacherPhone,
-    subject: detail.subject,
-    subjectsText: detail.subjectsText || decodeSubjectsLocal(detail.subject).join('、') || '—',
-    status: detail.status,
-    statusName,
-    statusDesc,
-    hourlyWage: detail.hourlyWage,
-    infoFee: detail.infoFee ?? 0,
-    description: detail.description ?? '',
-    verification: detail.verification,
-    teaDepositImg: detail.teaDepositImg,
-    stuDepositImg: detail.stuDepositImg,
-    infoFeeImg: detail.infoFeeImg,
-    infoFeeQr: detail.infoFeeQr,
+    studentId: o.studentId,
+    teacherId: o.teacherId,
+    studentName: o.studentName,
+    teacherName: o.teacherName,
+    studentCredit: o.studentCredit ?? 100,
+    teacherCredit: o.teacherCredit ?? 100,
+    studentPhone: o.studentPhone ?? undefined,
+    teacherPhone: o.teacherPhone ?? undefined,
+    subject: o.subject,
+    subjectsText: decodeSubjectsLocal(o.subject).join('、') || '—',
+    status: o.status,
+    statusName: statusNameOf(o.status),
+    statusDesc: statusDescOf(o.status),
+    hourlyWage: o.hourlyWage,
+    infoFee: o.infoFee ?? 0,
+    description: o.description ?? '',
+    verification: o.verification,
+    teaDepositImg: o.depositImgTea ?? undefined,
+    stuDepositImg: o.depositImgStu ?? undefined,
+    infoFeeImg: o.infoFeeImg ?? undefined,
+    infoFeeQr: o.infoFeeQr ?? undefined,
     timeTables: [
-      detail.timeTable1,
-      detail.timeTable2,
-      detail.timeTable3,
-      detail.timeTable4,
-      detail.timeTable5,
-      detail.timeTable6,
-      detail.timeTable7,
+      o.timeTable1 ?? 0,
+      o.timeTable2 ?? 0,
+      o.timeTable3 ?? 0,
+      o.timeTable4 ?? 0,
+      o.timeTable5 ?? 0,
+      o.timeTable6 ?? 0,
+      o.timeTable7 ?? 0,
     ],
-    createdAt: detail.createdAt,
+    createdAt: o.createdAt,
   }
 }
 
 /** 该用户参与的全部订单（行级摘要） */
 export async function listOrdersForUserAdmin(role: 'student' | 'teacher', id: number): Promise<AdminOrderRow[]> {
   const all = await listAllOrders()
-  return all.filter((o) => (role === 'student' ? o.studentName : o.teacherName))
+  return all.filter((o) => (role === 'student' ? o.studentId === id : o.teacherId === id))
 }
 
 // ---------- 用户 ----------
 
-/** 后台用户视图（含手机号等敏感字段） */
+/** GET /api/admin/teachers|students 原始实体（驼峰，无 role 字段；password 已置空） */
+interface AdminUserRawDTO {
+  id: number
+  nickname: string
+  phone: string
+  age?: number | null
+  gender?: string | null
+  credit: number
+  grade: number
+  subject: number
+  description?: string | null
+  address?: string | null
+  /** 0=寻找中 1=已停止/未激活 */
+  status: number
+  timeTable1: number
+  timeTable2: number
+  timeTable3: number
+  timeTable4: number
+  timeTable5: number
+  timeTable6: number
+  timeTable7: number
+  qrcode?: string | null
+  idcard?: string | null
+  certificate?: string | null
+}
+
+/** 后台用户视图（含手机号等敏感字段；role/seeking/timeTables 由前端组装） */
 export interface AdminUserView {
   id: number
   role: 'student' | 'teacher'
@@ -291,15 +280,40 @@ export interface AdminUserView {
   gender?: string
   description?: string
   address?: string
+  qrcode?: string
+  idcard?: string
+  certificate?: string
   timeTables: [number, number, number, number, number, number, number]
+}
+
+function dtoToAdminUser(role: 'student' | 'teacher', u: AdminUserRawDTO): AdminUserView {
+  return {
+    id: u.id,
+    role,
+    nickname: u.nickname,
+    phone: u.phone,
+    status: u.status,
+    seeking: u.status === 0,
+    grade: u.grade,
+    subject: u.subject,
+    credit: u.credit,
+    age: u.age ?? undefined,
+    gender: u.gender ?? undefined,
+    description: u.description ?? undefined,
+    address: u.address ?? undefined,
+    qrcode: u.qrcode ?? undefined,
+    idcard: u.idcard ?? undefined,
+    certificate: u.certificate ?? undefined,
+    timeTables: [u.timeTable1, u.timeTable2, u.timeTable3, u.timeTable4, u.timeTable5, u.timeTable6, u.timeTable7],
+  }
 }
 
 export async function listAllUsers(): Promise<AdminUserView[]> {
   const [ts, ss] = await Promise.all([
-    http.get<AdminUserView[]>('/api/admin/teachers'),
-    http.get<AdminUserView[]>('/api/admin/students'),
+    http.get<AdminUserRawDTO[]>('/api/admin/teachers'),
+    http.get<AdminUserRawDTO[]>('/api/admin/students'),
   ])
-  return [...ts, ...ss]
+  return [...ts.map((u) => dtoToAdminUser('teacher', u)), ...ss.map((u) => dtoToAdminUser('student', u))]
 }
 
 export async function getUserAdmin(role: 'student' | 'teacher', id: number): Promise<AdminUserView | null> {

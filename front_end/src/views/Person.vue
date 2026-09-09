@@ -24,8 +24,8 @@ const loading = ref(true)
 
 const isSelf = computed(() => !!profile.value && profile.value.isSelf)
 
-const canResume = computed(() => meRole.value === 'teacher' && role === 'student' && !isSelf.value)
-const canTrial = computed(() => meRole.value === 'student' && role === 'teacher' && !isSelf.value)
+const canResume = computed(() => meRole.value === 'teacher' && role === 'student' && !isSelf.value && !!profile.value?.seeking)
+const canTrial = computed(() => meRole.value === 'student' && role === 'teacher' && !isSelf.value && !!profile.value?.seeking)
 
 // 发起匹配弹窗
 const dlg = ref(false)
@@ -124,14 +124,17 @@ function back() {
           </el-button>
           <span class="muted">首节课免费试听，满意再续</span>
         </div>
-        <div v-else-if="!isSelf && meRole === profile.role" class="self-notice">
+        <div v-else-if="!isSelf && profile.role === meRole" class="self-notice">
           <el-alert type="info" :closable="false" title="您与学生/老师同属一类，无法发起匹配" />
+        </div>
+        <div v-else-if="!isSelf && !profile.seeking" class="self-notice">
+          <el-alert type="info" :closable="false" title="对方当前暂停寻找，暂无法发起匹配" />
         </div>
       </el-card>
     </template>
 
     <!-- 发起匹配弹窗 -->
-    <el-dialog v-model="dlg" :title="canResume ? '投递简历' : '免费试课'" width="640px">
+    <el-dialog v-model="dlg" :title="canResume ? '投递简历' : '免费试课'" width="640px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item :label="'匹配科目（可多选，' + profile?.nickname + ' 所需/可授）'">
           <el-select v-model="form.subjects" multiple placeholder="选择一个或多个科目" style="width: 100%">

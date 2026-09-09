@@ -92,15 +92,10 @@ public class ProfileReviewService {
         if (body == null || body.getProfile() == null || body.getProfile().isEmpty()) {
             throw new BizException("缺少修改内容");
         }
-        if (body.getFields() == null || body.getFields().isEmpty()) {
-            throw new BizException("本次没有任何改动");
-        }
         if (hasPending(type, userId)) {
             throw new BizException("已有待审核的申请，请等待管理员处理或先撤回");
         }
-        if (body.getName() == null || body.getName().isBlank()) {
-            throw new BizException("缺少提交人昵称");
-        }
+        // name/fields 仅作管理员展示辅助，允许缺省（name 缺省用当前昵称兜底）
         // 入驻被驳回（status=1）的账号再次提交 = 重新激活入驻申请；正常账号提交 = 资料修改
         boolean reactivate = accountStatus(type, userId) == 1;
 

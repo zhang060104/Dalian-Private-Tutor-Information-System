@@ -1,15 +1,21 @@
 // ============================================================================
-// 订单接口（真实后端，8083）
-// 文档第 3 节：状态机 0..12 + 订单全流程动作
+// 订单接口（对齐后端契约 8083，状态机 0..12）
+// 后端 OrderController Map 输出（驼峰）:
+//   id/studentId/teacherId/subject/hourlyWage/description/status/verification/infoFee
+//   timeTable1..7/createdAt/updatedAt
+//   teacherName/studentName/teacherCredit/studentCredit/teacherGrade/studentGrade/teacherSubject/studentSubject
+//   详情视图(full)额外(仅参与者/管理员且视角色):
+//     studentPhone/studentAddress(教师或admin视角) · teacherPhone/teacherAddress(学生或admin视角)
+//     infoFeeQr(教师status>=5或admin) · depositImgTea(教师/admin) · depositImgStu(学生/admin) · infoFeeImg(教师/admin)
 // ============================================================================
 import http from './http'
 import type { Order, Role, WeekTimeTables } from '@/types'
 
-/** 后端返回的订单 DTO（含双方可见联系方式、信用分等） */
+/** 后端订单 Map（驼峰，按角色返回联系方式） */
 interface OrderDTO {
   id: number
-  student_id: number
-  teacher_id: number
+  studentId: number
+  teacherId: number
   subject: number
   hourlyWage: number
   description?: string
@@ -17,8 +23,8 @@ interface OrderDTO {
   verification: number // 低3位：师定金/生定金/信息费
   infoFee?: number
   infoFeeQr?: string | null
-  teaDepositImg?: string | null
-  stuDepositImg?: string | null
+  depositImgTea?: string | null
+  depositImgStu?: string | null
   infoFeeImg?: string | null
   timeTable1: number
   timeTable2: number
@@ -29,7 +35,7 @@ interface OrderDTO {
   timeTable7: number
   createdAt: string
   updatedAt?: string
-  // 双方补充信息
+  // 双方补充信息（publicMap 总会放）
   studentName?: string
   teacherName?: string
   studentCredit?: number
@@ -38,9 +44,11 @@ interface OrderDTO {
   teacherGrade?: number
   studentSubject?: number
   teacherSubject?: number
-  // 联系方式（仅 status>=6 时下发）
-  phone?: string
-  address?: string
+  // 联系方式（仅详情视图；teacher/admin 视角取 student*，student/admin 视角取 teacher*）
+  studentPhone?: string | null
+  studentAddress?: string | null
+  teacherPhone?: string | null
+  teacherAddress?: string | null
 }
 
 function ttFrom(o: OrderDTO): WeekTimeTables {
@@ -55,7 +63,7 @@ function dtoToOrder(o: OrderDTO, viewerRole: Role | null): Order {
     null
   const peer = peerRole === 'student'
     ? {
-        id: o.student_id,
+        id: o.studentId,
         role: 'student' as const,
         nickname: o.studentName ?? '',
         grade: o.studentGrade ?? 0,
@@ -64,7 +72,7 @@ function dtoToOrder(o: OrderDTO, viewerRole: Role | null): Order {
       }
     : peerRole === 'teacher'
     ? {
-        id: o.teacher_id,
+        id: o.teacherId,
         role: 'teacher' as const,
         nickname: o.teacherName ?? '',
         grade: o.teacherGrade ?? 0,
@@ -72,10 +80,17 @@ function dtoToOrder(o: OrderDTO, viewerRole: Role | null): Order {
         credit: o.teacherCredit ?? 0,
       }
     : undefined
+  // 联系方式：后端按视角只放一边（admin 两边都有，取对方的即可）
+  const contact =
+    viewerRole === 'student'
+      ? { phone: o.teacherPhone, address: o.teacherAddress }
+      : viewerRole === 'teacher'
+      ? { phone: o.studentPhone, address: o.studentAddress }
+      : { phone: o.studentPhone, address: o.studentAddress }
   return {
     id: o.id,
-    student_id: o.student_id,
-    teacher_id: o.teacher_id,
+    student_id: o.studentId,
+    teacher_id: o.teacherId,
     subject: o.subject,
     hourlyWage: o.hourlyWage,
     description: o.description ?? '',
@@ -83,18 +98,15 @@ function dtoToOrder(o: OrderDTO, viewerRole: Role | null): Order {
     verification: o.verification,
     infoFee: o.infoFee ?? 0,
     infoFeeQr: o.infoFeeQr ?? undefined,
-    teaDepositImg: o.teaDepositImg ?? undefined,
-    stuDepositImg: o.stuDepositImg ?? undefined,
+    teaDepositImg: o.depositImgTea ?? undefined,
+    stuDepositImg: o.depositImgStu ?? undefined,
     infoFeeImg: o.infoFeeImg ?? undefined,
     timeTables: ttFrom(o),
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
     peer,
-    // status>=6 才下发 phone/address
-    visibleContact:
-      o.status >= 6 && o.phone
-        ? { phone: o.phone, address: o.address ?? null }
-        : null,
+    // 后端仅在 status>=6(核验完成) 才放联系方式；没放就是不可见
+    visibleContact: contact.phone ? { phone: contact.phone, address: contact.address ?? null } : null,
   }
 }
 

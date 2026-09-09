@@ -52,13 +52,11 @@ function stageText(s: string | undefined): string {
   return s ? map[s] ?? s : ''
 }
 
-/** 真实上传：multipart 到 /api/upload，返回 url */
+/** 真实上传：multipart 到 /api/upload，返回 url（登录态走 Authorization，勿手动设置 Content-Type） */
 async function uploadOne(file: File): Promise<string> {
   const fd = new FormData()
   fd.append('file', file)
-  const res = await http.post<{ url: string }>('/api/upload', fd, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const res = await http.post<{ url: string }>('/api/upload', fd)
   return res.url
 }
 
@@ -73,6 +71,8 @@ function depositKinds(): {
   label: string
   amount: number
   done: boolean
+  /** 我上传的凭证回显（上传后未核验期间） */
+  uploaded?: string
 }[] {
   const o = order.value!
   const list = [] as {
@@ -80,16 +80,18 @@ function depositKinds(): {
     label: string
     amount: number
     done: boolean
+    uploaded?: string
   }[]
   if (isStudent) {
-    list.push({ kind: 'stuDeposit', label: '学生定金', amount: o.hourlyWage, done: (o.verification & 2) === 2 })
+    list.push({ kind: 'stuDeposit', label: '学生定金', amount: o.hourlyWage, done: (o.verification & 2) === 2, uploaded: o.stuDepositImg })
   } else {
-    list.push({ kind: 'teaDeposit', label: '教师定金', amount: o.hourlyWage, done: (o.verification & 1) === 1 })
+    list.push({ kind: 'teaDeposit', label: '教师定金', amount: o.hourlyWage, done: (o.verification & 1) === 1, uploaded: o.teaDepositImg })
     list.push({
       kind: 'infoFee',
       label: '信息费（首周）',
       amount: o.infoFee || o.hourlyWage * 2,
       done: (o.verification & 4) === 4,
+      uploaded: o.infoFeeImg,
     })
   }
   return list
@@ -148,6 +150,13 @@ const arbDlg = ref(false)
 const arbText = ref('')
 const arbEvidence = ref<UploadUserFile[]>([])
 const arbCaptcha = ref(false)
+// 弹窗每次打开都重置（destroy-on-close 重建滑块，旧成功状态失效）
+function openArbDlg() {
+  arbText.value = ''
+  arbEvidence.value = []
+  arbCaptcha.value = false
+  arbDlg.value = true
+}
 async function submitArbitration() {
   if (!order.value) return
   if (!arbText.value.trim()) return ElMessage.warning('请描述违约情况')
@@ -224,7 +233,7 @@ onMounted(async () => {
       </el-card>
 
       <!-- 缴费核验状态 -->
-      <el-card v-if="actions.needDeposit || order.status >= 5 && order.status <= 6" shadow="never" class="mb-16">
+      <el-card v-if="actions.needDeposit || (order.status >= 5 && order.status <= 6)" shadow="never" class="mb-16">
         <template #header>费用缴纳与核验</template>
         <div class="pays">
           <div v-for="k in depositKinds()" :key="k.kind" class="pay-item" :class="{ done: k.done }">
@@ -233,10 +242,22 @@ onMounted(async () => {
               <span class="muted">金额 ¥{{ k.amount }}</span>
             </div>
             <template v-if="k.done">
-              <el-tag type="success" effect="plain">已缴纳</el-tag>
-              <span class="muted" style="font-size: 12px">待管理员核验 / 已核验</span>
+              <el-tag type="success" effect="plain">已核验</el-tag>
+            </template>
+            <template v-else-if="k.uploaded">
+              <div class="flex gap-8" style="align-items: center">
+                <el-image :src="k.uploaded" :preview-src-list="[k.uploaded]" preview-teleported fit="cover" style="width: 44px; height: 44px; border-radius: 6px" />
+                <el-tag type="info" effect="plain">已上传，待管理员核验</el-tag>
+              </div>
             </template>
             <el-button v-else size="small" type="primary" plain @click="openPay(k.kind)">上传付款截图</el-button>
+          </div>
+          <!-- 平台信息费收款码：教师端在缴费期查看 -->
+          <div v-if="order.infoFeeQr && !isStudent" class="flex gap-8" style="align-items: flex-start; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #eef1f6">
+            <div style="width: 110px; height: 110px; flex: none; border: 1px solid #eef1f6; border-radius: 8px; overflow: hidden">
+              <el-image :src="order.infoFeeQr" :preview-src-list="[order.infoFeeQr]" preview-teleported fit="contain" style="width: 100%; height: 100%" />
+            </div>
+            <div class="muted" style="font-size: 13px; line-height: 1.7">扫描平台收款码支付<b style="color:#e6a23c">信息费 ¥{{ order.infoFee || order.hourlyWage * 2 }}</b>，支付成功后截图上传核验（教师本人操作）</div>
           </div>
         </div>
         <div v-if="order.status === 6" class="trial-tip">
@@ -249,18 +270,19 @@ onMounted(async () => {
         <template #header>操作</template>
         <div class="acts">
           <el-button v-if="actions.primary" type="primary" size="large" :loading="acting" @click="onPrimary">{{ actions.primary }}</el-button>
+          <span v-else-if="actions.waiting" class="muted" style="font-size: 14px">⏳ {{ actions.waiting }}</span>
           <el-button v-if="actions.canEditInfo" size="large" @click="goEdit">修改订单信息</el-button>
           <el-button v-if="actions.canClose" size="large" type="warning" plain @click="doAction(() => requestClose(order!.id), '已发起结单请求，等待对方同意')">发起结单</el-button>
           <el-button v-if="actions.canPassTrial && order.status === 6" size="large" type="success" @click="doAction(() => passTrial(order!.id), '已标记试课通过，等待对方确认')">试课通过</el-button>
-          <el-button v-if="actions.canArbitrate" size="large" type="danger" plain @click="arbDlg = true">申请毁约仲裁</el-button>
-          <el-button v-if="actions.canCancel" size="small" text type="danger" @click="doAction(() => cancelOrder(order!.id), '订单已取消')">取消订单</el-button>
+          <el-button v-if="actions.canArbitrate" size="large" type="danger" plain @click="openArbDlg">申请毁约仲裁</el-button>
+          <el-button v-if="actions.canCancel" size="small" text type="danger" @click="doAction(() => cancelOrder(order!.id), order.status <= 1 ? '已撤回该申请' : '订单已取消并结束')">{{ order.status <= 1 ? '撤回申请' : '取消订单' }}</el-button>
           <el-button v-if="actions.closed" size="large" type="info" disabled>订单已结束</el-button>
         </div>
       </el-card>
     </template>
 
     <!-- 缴费弹窗 -->
-    <el-dialog v-model="payDlg" title="上传缴费凭证" width="460px">
+    <el-dialog v-model="payDlg" title="上传缴费凭证" width="460px" destroy-on-close>
       <el-alert type="warning" :closable="false" show-icon class="mb-16">请上传真实支付成功的交易记录截图，用于管理员核验。</el-alert>
       <el-upload action="#" :auto-upload="false" :limit="1" list-type="picture-card" accept="image/*" :on-change="(f: UploadUserFile) => (payFile = f)">
         <el-icon><Plus /></el-icon>
@@ -273,7 +295,7 @@ onMounted(async () => {
     </el-dialog>
 
     <!-- 仲裁弹窗 -->
-    <el-dialog v-model="arbDlg" title="申请毁约仲裁" width="520px">
+    <el-dialog v-model="arbDlg" title="申请毁约仲裁" width="520px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item label="违约情况描述"><el-input v-model="arbText" type="textarea" :rows="4" placeholder="请如实描述对方违约情况" /></el-form-item>
         <el-form-item label="证据图片（选填）">

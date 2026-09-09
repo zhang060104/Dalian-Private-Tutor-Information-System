@@ -1,21 +1,26 @@
 // ============================================================================
-// 学生 / 教师资料接口（真实后端）
-//  - GET /api/students · GET /api/teachers · GET /api/profile · GET /api/profile/me
-//  - PATCH /api/profile/me/status(0/1) · POST /api/profile/review(需 captchaToken)
-// 后端 timeTable1..7 → 前端 WeekTimeTables[7]（转换层）
+// 学生 / 教师资料接口（对齐后端契约 8083）
+//  - 池列表:  GET /api/students · GET /api/teachers
+//  - 他人主页: GET /api/student/{id} · /api/teacher/{id}
+//  - 本人主页: GET /api/student/me · /api/teacher/me
+//  - 状态切换: PUT /api/student/me/status · /api/teacher/me/status  body {status:0|1}
+//  - 资料修改: POST /api/profile/review  body {captchaToken, name?, fields?, profile{...}}
+//  - 撤回:     POST /api/profile/review/{id}/cancel
+// 后端返回 Map（驼峰）: id/nickname/age/gender/credit/grade/subject/description/status/timeTable1..7
+//  full 视图额外: phone/address/qrcode/idcard(/certificate) + isMe + orders/review
 // ============================================================================
 import http from './http'
 import type { Profile, Role, WeekTimeTables } from '@/types'
 
-/** 后端学生/教师/我的资料返回结构（驼峰由 MyBatis map-underscore-to-camel-case 提供） */
+/** 后端返回的用户资料（驼峰 Map / 实体 JSON） */
 interface ProfileDTO {
   id: number
   nickname: string
-  age?: number
-  gender?: string
+  age?: number | null
+  gender?: string | null
   grade: number
   subject: number
-  description?: string
+  description?: string | null
   address?: string | null
   qrcode?: string | null
   idcard?: string | null
@@ -29,7 +34,6 @@ interface ProfileDTO {
   timeTable7: number
   status: number
   credit: number
-  seeking: number
   isMe?: boolean
   isSuper?: boolean
 }
@@ -58,8 +62,9 @@ function ttFromDto(p: ProfileDTO): WeekTimeTables {
   ]
 }
 
-/** DTO → 前端 Profile（不暴露地址给非本人） */
+/** DTO → 前端 Profile（地址/电话等仅本人视图下发） */
 function dtoToProfile(role: Role, p: ProfileDTO, exposeAddress = false): Profile {
+  const self = !!p.isMe
   return {
     id: p.id,
     role,
@@ -69,13 +74,14 @@ function dtoToProfile(role: Role, p: ProfileDTO, exposeAddress = false): Profile
     grade: p.grade,
     subject: p.subject,
     description: p.description || '',
-    address: exposeAddress ? p.address ?? null : null,
+    // 本人视图（isMe=true 的 me/自看主页）才有 address
+    address: exposeAddress && self ? (p.address ?? null) : null,
     credit: p.credit,
-    seeking: !!p.seeking,
+    seeking: p.status === 0,
     status: p.status,
     timeTables: ttFromDto(p),
-    isSelf: !!p.isMe,
-    phoneVisible: !!p.isMe,
+    isSelf: self,
+    phoneVisible: self,
     isSuperAdmin: !!p.isSuper,
   }
 }
@@ -102,18 +108,21 @@ export async function getPerson(
   id: number
 ): Promise<Profile> {
   const p = await http.get<ProfileDTO>(
-    `/api/${role === 'student' ? 'students' : 'teachers'}/${id}`
+    `/api/${role === 'student' ? 'student' : 'teacher'}/${id}`
   )
   return dtoToProfile(role, p, true)
 }
 
 export async function getMyProfile(role: Role): Promise<Profile> {
-  const p = await http.get<ProfileDTO>('/api/profile/me', { params: { role } })
+  const path = role === 'student' ? '/api/student/me' : '/api/teacher/me'
+  const p = await http.get<ProfileDTO>(path)
   return dtoToProfile(role, p, true)
 }
 
-export async function setSeeking(role: Role): Promise<number> {
-  return http.put<number>(`/api/profile/me/status?role=${role}`)
+/** 切换寻找状态（0 寻找中 / 1 停止），即时生效 */
+export async function setSeeking(role: Role, status: 0 | 1): Promise<void> {
+  const path = role === 'student' ? '/api/student/me/status' : '/api/teacher/me/status'
+  await http.put(path, { status })
 }
 
 /** 提交资料修改申请（进入管理员审核队列） */
@@ -122,19 +131,20 @@ export async function requestProfileChange(
   captchaToken: string,
   patch: Partial<Profile>
 ): Promise<void> {
-  const payload: Record<string, unknown> = { role, captchaToken }
-  if (patch.nickname != null) payload.nickname = patch.nickname
-  if (patch.age != null) payload.age = patch.age
-  if (patch.gender != null) payload.gender = patch.gender
-  if (patch.grade != null) payload.grade = patch.grade
-  if (patch.subject != null) payload.subject = patch.subject
-  if (patch.description != null) payload.description = patch.description
-  if (patch.address != null) payload.address = patch.address
-  if (patch.timeTables) Object.assign(payload, ttArrToObject(patch.timeTables))
-  await http.post('/api/profile/review', payload)
+  // 后端契约：body {captchaToken, name?, fields?, profile{...}}，角色从登录态判断
+  const profile: Record<string, unknown> = {}
+  if (patch.nickname != null) profile.nickname = patch.nickname
+  if (patch.age != null) profile.age = patch.age
+  if (patch.gender != null) profile.gender = patch.gender
+  if (patch.grade != null) profile.grade = patch.grade
+  if (patch.subject != null) profile.subject = patch.subject
+  if (patch.description != null) profile.description = patch.description
+  if (patch.address != null) profile.address = patch.address
+  if (patch.timeTables) Object.assign(profile, ttArrToObject(patch.timeTables))
+  await http.post('/api/profile/review', { captchaToken, profile })
 }
 
-/** 资料修改申请撤回 */
-export async function cancelProfileChange(role: Role, id: number): Promise<void> {
-  await http.delete(`/api/profile/review?role=${role}&id=${id}`)
+/** 撤回资料修改申请 */
+export async function cancelProfileChange(id: number): Promise<void> {
+  await http.post(`/api/profile/review/${id}/cancel`)
 }

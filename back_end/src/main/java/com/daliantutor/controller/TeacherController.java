@@ -52,6 +52,7 @@ public class TeacherController {
         if (t == null) throw new BizException("教师不存在");
         boolean self = "teacher".equals(role) && Integer.parseInt(userId) == id;
         Map<String, Object> m = self ? fullTeacher(t) : publicTeacher(t);
+        m.put("isMe", self);
         if (self) {
             m.put("orders", orderMapper.selectActiveByUser("teacher", id));
         }
@@ -80,6 +81,7 @@ public class TeacherController {
         Teacher t = teacherMapper.findById(me);
         if (t == null) throw new BizException("账号不存在");
         Map<String, Object> m = fullTeacher(t);
+        m.put("isMe", true);
         m.put("orders", orderMapper.selectActiveByUser("teacher", me));
         m.put("review", reviewService.findMine(ProfileReviewService.TYPE_TEACHER, me));
         return ApiResponse.ok(m);

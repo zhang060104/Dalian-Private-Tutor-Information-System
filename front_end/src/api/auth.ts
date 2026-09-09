@@ -47,7 +47,12 @@ export async function adminLogin(account: string, password: string): Promise<Log
   return http.post<LoginResultDTO>('/api/auth/login', { role: 'admin', phone: account, password })
 }
 
-/** 入驻注册（需 captchaToken） */
-export async function register(payload: RegisterPayloadDTO): Promise<{ id: number }> {
-  return http.post<{ id: number }>('/api/auth/register', payload)
+/** 入驻注册（需 captchaToken）。后端返回 {accountId,status,message}，status=0 激活/1 待审核 */
+export interface RegisterResultDTO {
+  accountId: number
+  status: number
+  message: string
+}
+export async function register(payload: RegisterPayloadDTO): Promise<RegisterResultDTO> {
+  return http.post<RegisterResultDTO>('/api/auth/register', payload)
 }

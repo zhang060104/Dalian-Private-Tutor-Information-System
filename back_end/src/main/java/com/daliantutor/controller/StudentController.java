@@ -55,6 +55,7 @@ public class StudentController {
         if (s == null) throw new BizException("学生不存在");
         boolean self = "student".equals(role) && Integer.parseInt(userId) == id;
         Map<String, Object> m = self ? fullStudent(s) : publicStudent(s);
+        m.put("isMe", self);
         if (self) {
             List<Order> orders = orderMapper.selectActiveByUser("student", id);
             m.put("orders", orders);
@@ -114,6 +115,7 @@ public class StudentController {
         Student s = studentMapper.findById(me);
         if (s == null) throw new BizException("账号不存在");
         Map<String, Object> m = fullStudent(s);
+        m.put("isMe", true);
         m.put("orders", orderMapper.selectActiveByUser("student", me));
         m.put("review", reviewService.findMine(ProfileReviewService.TYPE_STUDENT, me));
         return ApiResponse.ok(m);

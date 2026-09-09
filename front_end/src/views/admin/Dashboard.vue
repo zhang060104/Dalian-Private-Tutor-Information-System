@@ -19,11 +19,14 @@ onMounted(refresh)
 
 function descOf(i: RequestDTO): string {
   const t = i.type
-  const tid = (i as unknown as { tarId?: number }).tarId ?? (i.payload as { orderId?: number })?.orderId ?? (i.payload as { id?: number })?.id
+  const tid = i.tarId ?? (i.payload as { orderId?: number })?.orderId ?? (i.payload as { id?: number })?.id
   if (t === 0 || t === 1) {
-    const phone = (i.payload as { phone?: string })?.phone ?? ''
-    const nickname = (i.payload as { nickname?: string })?.nickname ?? ''
-    return `${nickname || '账号'}（${phone || '—'}）`
+    // 后端 requestView 对 0/1 附带 targetName/targetPhone；payload 内 profile.nickname/phone 兜底
+    const payload = i.payload as { name?: string; profile?: Record<string, unknown> }
+    const profile = payload.profile ?? {}
+    const nickname = i.targetName ?? payload.name ?? profile.nickname ?? '账号'
+    const phone = i.targetPhone ?? profile.phone ?? '—'
+    return `${nickname}（${phone}）`
   }
   if (t === 2) return `教师定金核验（订单 #${tid}）`
   if (t === 3) return `学生定金核验（订单 #${tid}）`

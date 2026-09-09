@@ -103,8 +103,10 @@ public class AdminController {
             Student s = studentMapper.findById(o.getStudentId());
             m.put("teacherName", t == null ? null : t.getNickname());
             m.put("teacherPhone", t == null ? null : t.getPhone());
+            m.put("teacherCredit", t == null ? null : t.getCredit());
             m.put("studentName", s == null ? null : s.getNickname());
             m.put("studentPhone", s == null ? null : s.getPhone());
+            m.put("studentCredit", s == null ? null : s.getCredit());
             out.add(m);
         }
         return ApiResponse.ok(out);

@@ -15,12 +15,13 @@ async function refresh() {
   loading.value = true
   try {
     items.value = await listRequests({ pending: true, type: 5 })
-    // 拉每个订单的详情以便拿双方姓名
+    // 拉每个订单的详情以便拿双方姓名（后端无单查，由全量列表行组装）
     const ids = [...new Set(arbs.value.map((r) => orderIdOf(r)))]
     for (const id of ids) {
       if (!orderCache.value[id]) {
         try {
-          orderCache.value[id] = await getOrderAdmin(id)
+          const v = await getOrderAdmin(id)
+          if (v) orderCache.value[id] = v
         } catch {
           /* ignore */
         }
@@ -40,9 +41,6 @@ function textOf(r: RequestDTO): string {
 }
 function evidenceOf(r: RequestDTO): string[] {
   return ((r.payload as { images?: string[] })?.images) ?? []
-}
-function initiatorOf(r: RequestDTO): 'student' | 'teacher' | null {
-  return ((r.payload as { role?: 'student' | 'teacher' })?.role) ?? null
 }
 function openOrder(r: RequestDTO) {
   router.push(`/admin/order/${orderIdOf(r)}`)
@@ -88,7 +86,7 @@ async function resolve(r: RequestDTO, blame: 'student' | 'teacher' | 'none') {
         <el-link type="primary" :underline="false" @click="openOrder(r)">
           订单 #{{ orderIdOf(r) }}
         </el-link>
-        <span class="muted">由{{ initiatorOf(r) === 'teacher' ? '教师' : '学生' }}提起</span>
+        <span class="muted">订单 {{ orderIdOf(r) }}</span>
       </div>
       <div class="text">{{ textOf(r) }}</div>
       <div v-if="evidenceOf(r).length" class="muted">

@@ -404,7 +404,10 @@ public class OrderController {
                                                    @RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId,
                                                    @RequestAttribute(AuthInterceptor.ATTR_ROLE) String role) {
         int me = Integer.parseInt(userId);
-        getOrder(id); // 校验存在
+        Order o = getOrder(id); // 校验存在
+        if (!"admin".equals(role) && !(me == o.getStudentId() || me == o.getTeacherId())) {
+            throw new BizException("无权查看该订单");
+        }
         return ApiResponse.ok(detailMap(id, role, me));
     }
 
@@ -442,6 +445,10 @@ public class OrderController {
         m.put("studentName", s == null ? null : s.getNickname());
         m.put("teacherCredit", t == null ? null : t.getCredit());
         m.put("studentCredit", s == null ? null : s.getCredit());
+        m.put("teacherGrade", t == null ? null : t.getGrade());
+        m.put("studentGrade", s == null ? null : s.getGrade());
+        m.put("teacherSubject", t == null ? null : t.getSubject());
+        m.put("studentSubject", s == null ? null : s.getSubject());
 
         boolean isTeacher = "teacher".equals(role) && me == o.getTeacherId();
         boolean isStudent = "student".equals(role) && me == o.getStudentId();

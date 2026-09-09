@@ -88,8 +88,11 @@ async function submitEdit() {
 }
 
 async function toggleStatus() {
-  const s = await setSeeking(meRole)
-  ElMessage.success(s === 1 ? '已停止寻找，不再出现在匹配列表' : '已恢复寻找')
+  if (!me.value) return
+  // 后端 PUT /api/{role}/me/status body {status:0|1}，返回空；由前端本地推导目标态
+  const target = me.value.status === 1 ? 0 : 1
+  await setSeeking(meRole, target)
+  ElMessage.success(target === 1 ? '已停止寻找，不再出现在匹配列表' : '已恢复寻找，将重新出现在匹配列表')
   load()
 }
 function goOrder(o: Order) {
@@ -154,7 +157,7 @@ onMounted(load)
     </template>
 
     <!-- 修改资料弹窗（提交管理员审核） -->
-    <el-dialog v-model="editOpen" title="修改我的资料" width="680px">
+    <el-dialog v-model="editOpen" title="修改我的资料" width="680px" destroy-on-close>
       <el-alert type="warning" :closable="false" show-icon class="mb-16">修改需提交管理员审核，审核通过后新资料生效</el-alert>
       <el-form ref="editFormRef" :model="edit" label-position="top">
         <el-row :gutter="16">
