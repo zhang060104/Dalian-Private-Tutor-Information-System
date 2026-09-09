@@ -1,8 +1,12 @@
-/* 全局基础样式（最小化，待业务开发时扩充） */
+/* 全局基础样式 —— 浅色、清爽 */
 :root {
-  color-scheme: light dark;
-  --color-bg: #ffffff;
-  --color-text: #213547;
+  --brand: #2f7cf6;
+  --brand-dark: #1a5fd0;
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --border: #e4e7ed;
+  --text: #2c3e50;
+  --text-2: #606266;
 }
 
 *,
@@ -13,10 +17,15 @@
   font-weight: normal;
 }
 
+html,
+body,
+#app {
+  height: 100%;
+}
+
 body {
-  min-height: 100vh;
-  color: var(--color-text);
-  background: var(--color-bg);
+  color: var(--text);
+  background: var(--bg);
   font-family:
     system-ui,
     -apple-system,
@@ -25,8 +34,71 @@ body {
     'Microsoft YaHei',
     sans-serif;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-#app {
-  min-height: 100vh;
+a {
+  color: var(--brand);
+  text-decoration: none;
+}
+
+/* 通用页面容器 */
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.muted {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.flex {
+  display: flex;
+  align-items: center;
+}
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gap-8 {
+  gap: 8px;
+}
+.mt-16 {
+  margin-top: 16px;
+}
+.mt-24 {
+  margin-top: 24px;
+}
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+/* 信用分徽标 */
+.credit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f0f7ff;
+  color: #1a5fd0;
+  border: 1px solid #d3e3fb;
 }
