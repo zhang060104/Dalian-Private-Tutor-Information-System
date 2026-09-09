@@ -144,3 +144,41 @@
   schema 重构待「数据库设计说明文档.md」更新后落地。
 - 后续：数据库文档 → 数据库重构 + 后端逻辑重构 → 前端按新契约重开发。
 - 提交人：Claw 助手 / zhang060104 授权
+
+---
+
+## 2026-09-09 · 后端业务层完整实现 + 全链路冒烟通过（feature/backend-service）
+
+**背景**：完成设计文档最终定稿（注册=入驻审核制、requestLog type0-5 生命周期、订单状态机 0-12、privacy 规则），随后批量实现全部业务层代码。
+
+**数据库**：
+- ack_end/sql/schema.sql + seed.sql 重写重建（库 dalian_tutor，5 表：admin/teacher/student/order/requestLog）
+- seed：超管 id=0 13800000000 is_super=1；运营管理员 13800000009；教师/学生各 3 个示例；密码统一 123456；timeTable 工作日 261888 / 周末 130560；location 为 POINT(4326)
+- 移除了项目根下旧的数据库脚本（收敛到 back_end/sql/），删除过时的 数据库设计说明文档.md
+
+**注册 = 入驻审核制（最终方案）**：
+- POST /api/auth/register（滑块验证码）→ 直接建号 status=1（不可见/不可投递）+ 提交入驻审核 requestLog(type0/1, kind=register)
+- 审核期间可登录（status=1 提示"资料审核中"）
+- 管理员 approve → status=0 激活上架；reject → 账号保留（status=1），用户改资料重提（kind 自动=register 再激活）
+- 撤回入驻申请 → 删除账号释放手机号；重复注册/重复提交有防重
+
+**requestLog = 审计保留制**：admin_id -1(待审)→管理员 id（claim 防并发 UPDATE WHERE admin_id=-1）；json 追加 decision/note/processedAt；处理完不删除
+
+**订单状态机 0-12（OrderController 完整实现）**：
+- 0/1 简历阶段：confirm→2；reject/cancel→物理删除；超 24h 每日 00:00 定时清理（@Scheduled + OrderCleanupTask）
+- 2 双方可提交明细（学生→3/教师→4）；3 教师确认→5 或再改→4；4 学生确认→5 或再改→3
+- 进入 5 时锁定 infoFee = hourlyWage × 每周课时 popcount 总和
+- 5 缴费：depositTea(教师定金,type2)/depositStu(学生定金,type3)/infoFee(教师信息费,type4)，同类型 pending 拦截重传
+- 管理员核验 type2/3/4 → verification bit0/1/2，(verification&7)==7 → 自动 status 6
+- 6/7/8 试课互按通过 → 9；不满意任一方 cancel → 12
+- 9 禁直接取消；settle 双向（教师→10/学生→11，对方确认→12）；arbitrate → type5，管理员 approve → 订单 12 / reject → 维持 9
+- 联系方式 status≥6 起才互见（防逃单）；infoFeeQr 教师端 status≥5 可见
+- 防重复：同一对师生 status<12 订单存在则拒绝新发起
+
+**其余接口**：滑块验证码 CaptchaService(Java2D,300x150,容差6px,5min可复用 token)+CaptchaController；UploadController(Bearer 或 X-Captcha-Token 二选一,≤10MB,白名单扩展名,/files/** 静态直出)；StudentController/TeacherController（列表池 status=0 过滤 + subject 位筛选 + 隐私脱敏 + me 全量 + 状态切换）；ProfileReviewService（kind register/update 双语义 + cancel）；AdminController（stats/列表/requests resolve/收款码上传/信用调整/管理员 CRUD 仅超管且 id=0 不可删）；登录含 admin 角色，/api/admin/** 拦截器守卫
+
+**验证**：mvn compile 通过；8083 起服务跑三轮冒烟（登录/滑块错误路径/注册→审核→激活/重复注册拦截/订单 0→2→3→5(infoFee 计算)→缴费→核验→6→7→9→10→12/拒绝删单/5 取消留记录/驳回→重提→激活/资料修改合并/撤回/超管门禁），全绿
+
+**交付**：ack_end/API说明文档.md（完整契约，供前端对接）
+- 端口 8083；启动：set DB_PASSWORD=xxx && mvn spring-boot:run；可选 TUTOR_TOKEN_SECRET / TUTOR_UPLOAD_DIR / TUTOR_CAPTCHA_DISABLED
+- 提交人：Tinker 🔧（离谱人授权继续）

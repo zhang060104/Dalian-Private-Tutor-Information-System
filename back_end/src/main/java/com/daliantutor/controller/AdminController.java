@@ -2,23 +2,25 @@ package com.daliantutor.controller;
 
 import com.daliantutor.common.ApiResponse;
 import com.daliantutor.common.BizException;
-import com.daliantutor.dto.OrderVO;
-import com.daliantutor.dto.ProfileReviewVO;
+import com.daliantutor.config.AuthInterceptor;
+import com.daliantutor.entity.Admin;
 import com.daliantutor.entity.Order;
 import com.daliantutor.entity.RequestLog;
 import com.daliantutor.entity.Student;
 import com.daliantutor.entity.Teacher;
-import com.daliantutor.mapper.OrderMapper;
-import com.daliantutor.mapper.RequestLogMapper;
-import com.daliantutor.mapper.StudentMapper;
-import com.daliantutor.mapper.TeacherMapper;
+import com.daliantutor.mapper.*;
 import com.daliantutor.service.ProfileReviewService;
+import com.daliantutor.util.PasswordUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * 管理后台：统计、老师/学生/订单列表、待审核请求
+ * 管理员后台（/api/admin/**，仅 admin 角色可访问）：
+ * 统计、师生/订单全量列表、requestLog 审核（注册入驻/资料修改/缴费核验/仲裁）、
+ * 信息费收款码上传、信用分调整、管理员管理（仅超管可增删，id=0 不可删）。
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -28,42 +30,31 @@ public class AdminController {
     private final StudentMapper studentMapper;
     private final OrderMapper orderMapper;
     private final RequestLogMapper requestLogMapper;
+    private final AdminMapper adminMapper;
     private final ProfileReviewService reviewService;
+    private final ObjectMapper objectMapper;
 
     public AdminController(TeacherMapper teacherMapper, StudentMapper studentMapper,
                            OrderMapper orderMapper, RequestLogMapper requestLogMapper,
-                           ProfileReviewService reviewService) {
+                           AdminMapper adminMapper, ProfileReviewService reviewService,
+                           ObjectMapper objectMapper) {
         this.teacherMapper = teacherMapper;
         this.studentMapper = studentMapper;
         this.orderMapper = orderMapper;
         this.requestLogMapper = requestLogMapper;
+        this.adminMapper = adminMapper;
         this.reviewService = reviewService;
+        this.objectMapper = objectMapper;
     }
 
-    /** 统计：老师/学生/订单/匹配数 */
+    /** 统计 */
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> stats() {
-        List<Teacher> teachers = teacherMapper.selectAll();
-        List<Student> students = studentMapper.selectAll();
-        List<Order> orders = orderMapper.selectAll();
-
-        // 匹配数：同一 (teacher, student) 对同时存在 status=0 与 status=1
-        Map<String, Integer> flags = new HashMap<>();
-        for (Order o : orders) {
-            String key = o.getTeacherId() + "|" + o.getStudentId();
-            int v = flags.getOrDefault(key, 0);
-            flags.put(key, v | (o.getStatus() == 0 ? 1 : 2));
-        }
-        int matched = 0;
-        for (int v : flags.values()) {
-            if (v == 3) matched++;
-        }
-
         Map<String, Object> r = new LinkedHashMap<>();
-        r.put("teacherCount", teachers.size());
-        r.put("studentCount", students.size());
-        r.put("orderCount", orders.size());
-        r.put("matchedCount", matched);
+        r.put("teacherCount", teacherMapper.selectAll().size());
+        r.put("studentCount", studentMapper.selectAll().size());
+        r.put("orderCount", orderMapper.selectAll().size());
+        r.put("pendingRequestCount", requestLogMapper.selectByType(-1, true).size());
         return ApiResponse.ok(r);
     }
 
@@ -82,58 +73,273 @@ public class AdminController {
     }
 
     @GetMapping("/orders")
-    public ApiResponse<List<OrderVO>> orders() {
-        List<Order> orders = orderMapper.selectAll();
-        List<OrderVO> vos = new ArrayList<>();
-        for (Order o : orders) {
-            OrderVO vo = new OrderVO();
-            vo.setId(o.getId());
-            vo.setStudentId(o.getStudentId());
-            vo.setTeacherId(o.getTeacherId());
-            vo.setSubject(o.getSubject());
-            vo.setHourlyWage(o.getHourlyWage());
-            vo.setDescription(o.getDescription());
-            vo.setStatus(o.getStatus());
-            vo.setVerification(o.getVerification());
-            vo.setInfoFee(o.getInfoFee());
-            vo.setCreatedAt(o.getCreatedAt());
+    public ApiResponse<List<Map<String, Object>>> orders() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Order o : orderMapper.selectAll()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", o.getId());
+            m.put("studentId", o.getStudentId());
+            m.put("teacherId", o.getTeacherId());
+            m.put("subject", o.getSubject());
+            m.put("hourlyWage", o.getHourlyWage());
+            m.put("description", o.getDescription());
+            m.put("status", o.getStatus());
+            m.put("verification", o.getVerification());
+            m.put("infoFee", o.getInfoFee());
+            m.put("timeTable1", o.getTimeTable1());
+            m.put("timeTable2", o.getTimeTable2());
+            m.put("timeTable3", o.getTimeTable3());
+            m.put("timeTable4", o.getTimeTable4());
+            m.put("timeTable5", o.getTimeTable5());
+            m.put("timeTable6", o.getTimeTable6());
+            m.put("timeTable7", o.getTimeTable7());
+            m.put("createdAt", o.getCreatedAt());
+            m.put("updatedAt", o.getUpdatedAt());
+            m.put("depositImgTea", o.getDepositImgTea());
+            m.put("depositImgStu", o.getDepositImgStu());
+            m.put("infoFeeImg", o.getInfoFeeImg());
+            m.put("infoFeeQr", o.getInfoFeeQr());
             Teacher t = teacherMapper.findById(o.getTeacherId());
             Student s = studentMapper.findById(o.getStudentId());
-            vo.setTeacherName(t != null ? t.getNickname() : null);
-            vo.setStudentName(s != null ? s.getNickname() : null);
-            vos.add(vo);
+            m.put("teacherName", t == null ? null : t.getNickname());
+            m.put("teacherPhone", t == null ? null : t.getPhone());
+            m.put("studentName", s == null ? null : s.getNickname());
+            m.put("studentPhone", s == null ? null : s.getPhone());
+            out.add(m);
         }
-        return ApiResponse.ok(vos);
+        return ApiResponse.ok(out);
     }
 
+    /** requestLog 列表：?type=0..5&pending=true 仅待审 */
     @GetMapping("/requests")
-    public ApiResponse<List<RequestLog>> requests() {
-        return ApiResponse.ok(requestLogMapper.selectAll());
-    }
-
-    /** 待审核的资料修改申请（type 0=教师信息修改，1=学生信息修改） */
-    @GetMapping("/reviews")
-    public ApiResponse<List<ProfileReviewVO>> reviews() {
-        return ApiResponse.ok(reviewService.listPending());
+    public ApiResponse<List<Map<String, Object>>> requests(@RequestParam(required = false) Integer type,
+                                                           @RequestParam(defaultValue = "false") boolean pending) {
+        List<RequestLog> logs = requestLogMapper.selectByType(type == null ? -1 : type, pending);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (RequestLog log : logs) {
+            out.add(requestView(log));
+        }
+        return ApiResponse.ok(out);
     }
 
     /**
-     * 处理待审核请求
-     *
-     * @param approve true=通过：资料修改类请求会把新资料写入 teacher / student 表；false=驳回，仅移除请求
+     * 审核处理（认领防并发：admin_id -1 -> 当前管理员；已处理则拒绝）。
+     * approve=true 时执行落库动作；驳回仅标记。
+     * 可选 profile：管理员手动修正后的最终资料（文档：可手动修改用户信息避免小细节反复不通过）。
      */
     @PostMapping("/requests/{id}/resolve")
-    public ApiResponse<Void> resolve(@PathVariable Integer id,
-                                     @RequestParam(defaultValue = "false") boolean approve) {
+    public ApiResponse<Map<String, Object>> resolve(@PathVariable Integer id,
+                                                    @RequestBody Map<String, Object> body,
+                                                    @RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId) {
+        boolean approve = body.get("approve") != null && Boolean.TRUE.equals(body.get("approve"));
+        String note = body.get("note") == null ? null : String.valueOf(body.get("note"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> overrideProfile = body.get("profile") instanceof Map
+                ? (Map<String, Object>) body.get("profile") : null;
+        int adminId = Integer.parseInt(userId);
+
         RequestLog log = requestLogMapper.findById(id);
-        if (log == null) {
-            throw new BizException("请求不存在");
+        if (log == null) throw new BizException("请求不存在");
+        if (requestLogMapper.claim(id, adminId) == 0) {
+            throw new BizException("该请求已被其他管理员处理");
         }
-        if (approve && (log.getType() == ProfileReviewService.TYPE_TEACHER
-                || log.getType() == ProfileReviewService.TYPE_STUDENT)) {
-            reviewService.apply(log);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", id);
+        result.put("type", log.getType());
+        switch (log.getType()) {
+            case 0, 1 -> { // 入驻注册 / 资料修改（kind=register / update）
+                Map<String, Object> payload = readPayload(log.getJson());
+                String kind = payload == null ? "update" : String.valueOf(payload.getOrDefault("kind", "update"));
+                if ("register".equals(kind)) {
+                    if (approve) {
+                        reviewService.approve(log, null);
+                        result.put("action", "register approved -> 账号已激活");
+                    } else {
+                        result.put("action", "register rejected -> 账号保持未激活");
+                    }
+                } else {
+                    if (approve) {
+                        reviewService.approve(log, overrideProfile);
+                        result.put("action", "profile update approved -> 已合并资料");
+                    } else {
+                        result.put("action", "profile update rejected");
+                    }
+                }
+            }
+            case 2, 3, 4 -> { // 缴费核验：定金（教师/学生）/ 信息费
+                if (approve) {
+                    Order o = orderMapper.findById(log.getTarId());
+                    if (o == null) throw new BizException("关联订单不存在");
+                    int bit = 1 << (log.getType() - 2); // type2->bit0 教师定金 type3->bit1 学生定金 type4->bit2 信息费
+                    int verification = (o.getVerification() == null ? 0 : o.getVerification()) | bit;
+                    orderMapper.updateVerification(o.getId(), verification);
+                    // 三项费用全部核验通过 -> 进入试课阶段 status 6
+                    if ((verification & 7) == 7 && o.getStatus() == 5) {
+                        orderMapper.updateStatus(o.getId(), 6);
+                        result.put("orderStatus", 6);
+                    }
+                    result.put("action", "payment verified -> verification=" + verification);
+                } else {
+                    result.put("action", "payment rejected -> 用户可重新上传凭证");
+                }
+            }
+            case 5 -> { // 订单毁约仲裁
+                if (approve) {
+                    Order o = orderMapper.findById(log.getTarId());
+                    if (o == null) throw new BizException("关联订单不存在");
+                    orderMapper.updateStatus(o.getId(), 12);
+                    result.put("action", "arbitration approved -> 订单终止(12)，押金退还线下处理");
+                } else {
+                    result.put("action", "arbitration rejected -> 订单维持原状态");
+                }
+            }
+            default -> throw new BizException("未知请求类型");
         }
-        requestLogMapper.deleteById(id);
+
+        // 回写 json：追加 decision/note/processedAt
+        Map<String, Object> payload = readPayload(log.getJson());
+        if (payload == null) payload = new LinkedHashMap<>();
+        payload.put("decision", approve ? "approved" : "rejected");
+        if (note != null) payload.put("note", note);
+        payload.put("processedAt", LocalDateTime.now().toString());
+        requestLogMapper.updateJson(id, writeJson(payload));
+
+        result.put("decision", approve ? "approved" : "rejected");
+        return ApiResponse.ok(result);
+    }
+
+    /** 管理员上传/更新订单的信息费收款码（教师缴费时扫码用） */
+    @PostMapping("/orders/{id}/info-fee-qr")
+    public ApiResponse<Void> uploadInfoFeeQr(@PathVariable Integer id, @RequestBody Map<String, String> body) {
+        String url = body.get("url");
+        if (url == null || url.isBlank()) throw new BizException("缺少收款码图片地址");
+        Order o = orderMapper.findById(id);
+        if (o == null) throw new BizException("订单不存在");
+        orderMapper.updateInfoFeeQr(id, url);
         return ApiResponse.ok();
+    }
+
+    /** 调整信用分 */
+    @PostMapping("/credit")
+    public ApiResponse<Void> credit(@RequestBody Map<String, Object> body) {
+        String role = body.get("role") == null ? null : String.valueOf(body.get("role"));
+        Object idRaw = body.get("id");
+        Object creditRaw = body.get("credit");
+        if (idRaw == null || creditRaw == null || role == null) throw new BizException("缺少参数");
+        int id = ((Number) idRaw).intValue();
+        int credit = ((Number) creditRaw).intValue();
+        if (credit < 0 || credit > 1000) throw new BizException("信用分范围 0~1000");
+        if ("teacher".equals(role)) teacherMapper.updateCredit(id, credit);
+        else if ("student".equals(role)) studentMapper.updateCredit(id, credit);
+        else throw new BizException("角色不合法");
+        return ApiResponse.ok();
+    }
+
+    /** 管理员列表 */
+    @GetMapping("/admins")
+    public ApiResponse<List<Admin>> admins() {
+        List<Admin> list = adminMapper.selectAll();
+        list.forEach(a -> a.setPassword(null));
+        return ApiResponse.ok(list);
+    }
+
+    /** 创建管理员：仅超管（id=0 且 is_super=1） */
+    @PostMapping("/admins")
+    public ApiResponse<Admin> createAdmin(@RequestBody Map<String, String> body,
+                                          @RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId) {
+        requireSuper(userId);
+        String nickname = body.get("nickname");
+        String phone = body.get("phone");
+        String password = body.get("password");
+        if (nickname == null || nickname.isBlank()) throw new BizException("请填写昵称");
+        if (phone == null || !phone.matches("\\d{11}")) throw new BizException("请填写 11 位手机号");
+        if (password == null || password.length() < 6) throw new BizException("密码至少 6 位");
+        if (adminMapper.findByPhone(phone) != null) throw new BizException("该手机号已是管理员");
+        Admin a = new Admin();
+        a.setNickname(nickname);
+        a.setPhone(phone);
+        a.setPassword(PasswordUtil.encode(password));
+        a.setIsSuper(0);
+        adminMapper.insert(a);
+        a.setPassword(null);
+        return ApiResponse.ok(a);
+    }
+
+    /** 删除管理员：仅超管；id=0 初始管理员不可删除 */
+    @DeleteMapping("/admins/{id}")
+    public ApiResponse<Void> deleteAdmin(@PathVariable Integer id,
+                                         @RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId) {
+        requireSuper(userId);
+        if (id == 0) throw new BizException("id=0 的初始管理员不可删除");
+        Admin a = adminMapper.findById(id);
+        if (a == null) throw new BizException("管理员不存在");
+        adminMapper.deleteById(id);
+        return ApiResponse.ok();
+    }
+
+    private void requireSuper(String userId) {
+        Admin me = adminMapper.findById(Integer.parseInt(userId));
+        if (me == null || me.getIsSuper() == null || me.getIsSuper() != 1) {
+            throw new BizException("仅超级管理员可执行此操作");
+        }
+    }
+
+    /** requestLog -> 管理端展示视图 */
+    private Map<String, Object> requestView(RequestLog log) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", log.getId());
+        m.put("type", log.getType());
+        m.put("typeName", switch (log.getType()) {
+            case 0 -> "教师入驻/资料修改";
+            case 1 -> "学生入驻/资料修改";
+            case 2 -> "教师定金核验";
+            case 3 -> "学生定金核验";
+            case 4 -> "教师信息费核验";
+            case 5 -> "订单毁约仲裁";
+            default -> "未知";
+        });
+        m.put("tarId", log.getTarId());
+        m.put("adminId", log.getAdminId());
+        m.put("createdAt", log.getCreatedAt());
+        m.put("payload", readPayload(log.getJson()));
+        // 关联展示
+        if (log.getType() == 0 || log.getType() == 1) {
+            int uid = log.getTarId();
+            if (log.getType() == 0) {
+                Teacher t = teacherMapper.findById(uid);
+                m.put("targetName", t == null ? null : t.getNickname());
+                m.put("targetPhone", t == null ? null : t.getPhone());
+            } else {
+                Student s = studentMapper.findById(uid);
+                m.put("targetName", s == null ? null : s.getNickname());
+                m.put("targetPhone", s == null ? null : s.getPhone());
+            }
+        } else if (log.getType() >= 2 && log.getType() <= 5) {
+            Order o = orderMapper.findById(log.getTarId());
+            if (o != null) {
+                m.put("orderId", o.getId());
+                m.put("orderStatus", o.getStatus());
+            }
+        }
+        return m;
+    }
+
+    private String writeJson(Object o) {
+        try {
+            return objectMapper.writeValueAsString(o);
+        } catch (Exception e) {
+            throw new BizException("数据序列化失败");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readPayload(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json, Map.class);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

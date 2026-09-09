@@ -2,82 +2,117 @@ package com.daliantutor.controller;
 
 import com.daliantutor.common.ApiResponse;
 import com.daliantutor.common.BizException;
-import com.daliantutor.dto.RegisterParams;
+import com.daliantutor.config.AuthInterceptor;
+import com.daliantutor.entity.Order;
 import com.daliantutor.entity.Teacher;
+import com.daliantutor.mapper.OrderMapper;
 import com.daliantutor.mapper.TeacherMapper;
-import com.daliantutor.util.PasswordUtil;
+import com.daliantutor.service.ProfileReviewService;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.*;
 
 /**
- * 老师：入驻注册、老师列表（学生看）、我的资料
+ * 教师端：列表池（学生浏览教师）、个人主页（本人=全量+进行中订单，他人=脱敏公开）
  */
 @RestController
 @RequestMapping("/api")
 public class TeacherController {
 
     private final TeacherMapper teacherMapper;
+    private final OrderMapper orderMapper;
+    private final ProfileReviewService reviewService;
 
-    public TeacherController(TeacherMapper teacherMapper) {
+    public TeacherController(TeacherMapper teacherMapper, OrderMapper orderMapper,
+                             ProfileReviewService reviewService) {
         this.teacherMapper = teacherMapper;
+        this.orderMapper = orderMapper;
+        this.reviewService = reviewService;
     }
 
-    @PostMapping("/teacher/register")
-    public ApiResponse<Teacher> register(@RequestBody RegisterParams p) {
-        validate(p);
-        if (teacherMapper.findByPhone(p.getPhone()) != null) {
-            throw new BizException("该手机号已注册，请直接登录");
-        }
-        Teacher t = new Teacher();
-        t.setNickname(p.getNickname());
-        t.setPassword(PasswordUtil.encode(p.getPassword()));
-        t.setPhone(p.getPhone());
-        t.setAge(p.getAge());
-        t.setGender(p.getGender());
-        t.setCredit(100);
-        t.setGrade(p.getGrade());
-        t.setSubject(p.getSubject());
-        t.setDescription(p.getDescription());
-        t.setStatus(0);
-        copyTimetable(p, t);
-        teacherMapper.insert(t);
-        t.setPassword(null);
-        return ApiResponse.ok(t);
-    }
-
-    /** 老师列表（学生选老师用） */
+    /** 教师池：学生免费试课指派用。仅 status=0；私密字段不下发 */
     @GetMapping("/teachers")
-    public ApiResponse<List<Teacher>> teachers() {
-        List<Teacher> list = teacherMapper.selectAvailable();
-        list.forEach(t -> t.setPassword(null));
-        return ApiResponse.ok(list);
-    }
-
-    /** 我的资料 */
-    @GetMapping("/teacher/me")
-    public ApiResponse<Teacher> me(@RequestAttribute("authUserId") String userId) {
-        Teacher t = teacherMapper.findById(Integer.parseInt(userId));
-        if (t == null) {
-            throw new BizException("账号不存在");
+    public ApiResponse<List<Map<String, Object>>> teachers(@RequestParam(required = false) Integer subject,
+                                                           @RequestParam(required = false) Integer grade,
+                                                           @RequestParam(required = false) String gender,
+                                                           @RequestParam(required = false) String keyword) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Teacher t : teacherMapper.selectPool(subject, grade, gender, keyword)) {
+            out.add(publicTeacher(t));
         }
-        t.setPassword(null);
-        return ApiResponse.ok(t);
+        return ApiResponse.ok(out);
     }
 
-    private void validate(RegisterParams p) {
-        if (p.getNickname() == null || p.getNickname().isBlank()) throw new BizException("请填写姓名");
-        if (p.getPassword() == null || p.getPassword().length() < 6) throw new BizException("密码至少 6 位");
-        if (p.getPhone() == null || !p.getPhone().matches("\\d{11}")) throw new BizException("请填写 11 位手机号");
+    /** 教师个人主页 */
+    @GetMapping("/teacher/{id}")
+    public ApiResponse<Map<String, Object>> profile(@PathVariable Integer id,
+                                                    @RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId,
+                                                    @RequestAttribute(AuthInterceptor.ATTR_ROLE) String role) {
+        Teacher t = teacherMapper.findById(id);
+        if (t == null) throw new BizException("教师不存在");
+        boolean self = "teacher".equals(role) && Integer.parseInt(userId) == id;
+        Map<String, Object> m = self ? fullTeacher(t) : publicTeacher(t);
+        if (self) {
+            m.put("orders", orderMapper.selectActiveByUser("teacher", id));
+        }
+        return ApiResponse.ok(m);
     }
 
-    private void copyTimetable(RegisterParams p, Teacher t) {
-        t.setTimeTable1(p.getTimeTable1());
-        t.setTimeTable2(p.getTimeTable2());
-        t.setTimeTable3(p.getTimeTable3());
-        t.setTimeTable4(p.getTimeTable4());
-        t.setTimeTable5(p.getTimeTable5());
-        t.setTimeTable6(p.getTimeTable6());
-        t.setTimeTable7(p.getTimeTable7());
+    /** 教师本人切换寻找状态（0 寻找中 / 1 停止） */
+    @PutMapping("/teacher/me/status")
+    public ApiResponse<Void> updateStatus(@RequestBody Map<String, Integer> body,
+                                          @RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId,
+                                          @RequestAttribute(AuthInterceptor.ATTR_ROLE) String role) {
+        if (!"teacher".equals(role)) throw new BizException("角色不符");
+        int me = Integer.parseInt(userId);
+        Integer status = body.get("status");
+        if (status == null || (status != 0 && status != 1)) throw new BizException("status 仅可为 0/1");
+        teacherMapper.updateStatus(me, status);
+        return ApiResponse.ok();
+    }
+
+    /** 教师本人完整资料 */
+    @GetMapping("/teacher/me")
+    public ApiResponse<Map<String, Object>> me(@RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId,
+                                               @RequestAttribute(AuthInterceptor.ATTR_ROLE) String role) {
+        if (!"teacher".equals(role)) throw new BizException("角色不符");
+        int me = Integer.parseInt(userId);
+        Teacher t = teacherMapper.findById(me);
+        if (t == null) throw new BizException("账号不存在");
+        Map<String, Object> m = fullTeacher(t);
+        m.put("orders", orderMapper.selectActiveByUser("teacher", me));
+        m.put("review", reviewService.findMine(ProfileReviewService.TYPE_TEACHER, me));
+        return ApiResponse.ok(m);
+    }
+
+    private Map<String, Object> publicTeacher(Teacher t) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", t.getId());
+        m.put("nickname", t.getNickname());
+        m.put("age", t.getAge());
+        m.put("gender", t.getGender());
+        m.put("credit", t.getCredit());
+        m.put("grade", t.getGrade());
+        m.put("subject", t.getSubject());
+        m.put("description", t.getDescription());
+        m.put("status", t.getStatus());
+        m.put("timeTable1", t.getTimeTable1());
+        m.put("timeTable2", t.getTimeTable2());
+        m.put("timeTable3", t.getTimeTable3());
+        m.put("timeTable4", t.getTimeTable4());
+        m.put("timeTable5", t.getTimeTable5());
+        m.put("timeTable6", t.getTimeTable6());
+        m.put("timeTable7", t.getTimeTable7());
+        return m;
+    }
+
+    private Map<String, Object> fullTeacher(Teacher t) {
+        Map<String, Object> m = publicTeacher(t);
+        m.put("phone", t.getPhone());
+        m.put("address", t.getAddress());
+        m.put("qrcode", t.getQrcode());
+        m.put("idcard", t.getIdcard());
+        m.put("certificate", t.getCertificate());
+        return m;
     }
 }
