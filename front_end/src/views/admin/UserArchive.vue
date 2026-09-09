@@ -2,8 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { Profile } from '@/types'
-import { getUserAdmin, listOrdersForUserAdmin, type AdminOrderRow } from '@/api/admin'
+import { getUserAdmin, listOrdersForUserAdmin, type AdminOrderRow, type AdminUserView } from '@/api/admin'
 import { gradeLabel } from '@/utils/grade'
 import { decodeSubjects } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
@@ -13,7 +12,7 @@ const router = useRouter()
 const role = (route.params.role as string) as 'student' | 'teacher'
 const id = Number(route.params.id)
 
-const profile = ref<Profile | null>(null)
+const profile = ref<AdminUserView | null>(null)
 const orders = ref<AdminOrderRow[]>([])
 const loading = ref(true)
 const activeTab = ref(route.query.tab === 'orders' ? 'orders' : 'profile')
@@ -35,19 +34,22 @@ function openOrder(r: AdminOrderRow) {
 function orderTag(row: AdminOrderRow): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
   if (row.status === 12) return 'info'
   if (row.status === 5) return 'warning'
-  if (row.status === 9 || row.status === 10 || row.status === 11) return 'success'
+  if (row.status >= 9 && row.status <= 11) return 'success'
   return 'primary'
 }
-onMounted(() => {
+const otherRole = computed(() => (role === 'student' ? 'teacher' : 'student'))
+const otherLabel = computed(() => (role === 'student' ? '教师' : '学生'))
+
+onMounted(async () => {
   loading.value = true
   try {
-    profile.value = getUserAdmin(role, id)
+    profile.value = await getUserAdmin(role, id)
     if (!profile.value) {
       ElMessage.error('用户不存在')
       router.replace('/admin/credit')
       return
     }
-    orders.value = listOrdersForUserAdmin(role, id)
+    orders.value = await listOrdersForUserAdmin(role, id)
   } finally {
     loading.value = false
   }
@@ -57,7 +59,9 @@ onMounted(() => {
 <template>
   <div v-loading="loading">
     <el-page-header class="ph" @back="router.back()">
-      <template #content>用户档案 · {{ role === 'teacher' ? '老师' : '学生' }} {{ profile?.nickname ?? '#' + id }}</template>
+      <template #content>
+        用户档案 · {{ role === 'teacher' ? '老师' : '学生' }} {{ profile?.nickname ?? '#' + id }}
+      </template>
     </el-page-header>
 
     <el-card v-if="profile" shadow="never" class="mb-16">
@@ -71,6 +75,7 @@ onMounted(() => {
             <span class="credit-pill">信用 {{ profile.credit }}</span>
           </div>
           <div class="muted">{{ profile.description || '暂无简介' }}</div>
+          <div class="muted">账号：{{ profile.phone }}</div>
         </div>
       </div>
     </el-card>
@@ -79,10 +84,14 @@ onMounted(() => {
       <el-tabs v-model="activeTab">
         <el-tab-pane label="个人资料" name="profile">
           <el-descriptions :column="2" border>
-            <el-descriptions-item :label="role === 'teacher' ? '本人年级' : '年级'">{{ gradeLabel(profile.grade) }}</el-descriptions-item>
+            <el-descriptions-item :label="role === 'teacher' ? '本人年级' : '年级'">
+              {{ gradeLabel(profile.grade) }}
+            </el-descriptions-item>
             <el-descriptions-item label="性别">{{ profile.gender ?? '—' }}</el-descriptions-item>
             <el-descriptions-item label="年龄">{{ profile.age ?? '—' }}</el-descriptions-item>
-            <el-descriptions-item :label="role === 'teacher' ? '可授科目' : '需要的科目'">{{ subjectsText() }}</el-descriptions-item>
+            <el-descriptions-item :label="role === 'teacher' ? '可授科目' : '需要的科目'">
+              {{ subjectsText() }}
+            </el-descriptions-item>
             <el-descriptions-item label="所在区域" :span="2">{{ profile.address || '—' }}</el-descriptions-item>
             <el-descriptions-item label="空闲时间" :span="2">{{ timeText() }}</el-descriptions-item>
           </el-descriptions>
@@ -90,14 +99,22 @@ onMounted(() => {
 
         <el-tab-pane :label="`历史订单（${orders.length}）`" name="orders">
           <el-table v-if="orders.length" :data="orders" stripe @row-click="openOrder" style="cursor: pointer">
-            <el-table-column label="订单号" width="90"><template #default="{ row }">#{{ row.id }}</template></el-table-column>
-            <el-table-column :label="role === 'student' ? '教师' : '学生'" min-width="110">
-              <template #default="{ row }">{{ role === 'student' ? row.teacherName : row.studentName }}</template>
+            <el-table-column label="订单号" width="90">
+              <template #default="{ row }">#{{ row.id }}</template>
+            </el-table-column>
+            <el-table-column :label="otherLabel" min-width="110">
+              <template #default="{ row }">
+                {{ otherRole === 'student' ? row.studentName : row.teacherName }}
+              </template>
             </el-table-column>
             <el-table-column prop="subjectsText" label="科目" min-width="130" />
-            <el-table-column label="时薪" width="90"><template #default="{ row }">¥{{ row.hourly_wage }}</template></el-table-column>
+            <el-table-column label="时薪" width="90">
+              <template #default="{ row }">¥{{ row.hourlyWage }}</template>
+            </el-table-column>
             <el-table-column label="状态" min-width="130">
-              <template #default="{ row }"><el-tag :type="orderTag(row)" effect="light">{{ row.statusName }}</el-tag></template>
+              <template #default="{ row }">
+                <el-tag :type="orderTag(row)" effect="light">{{ row.statusName }}</el-tag>
+              </template>
             </el-table-column>
             <el-table-column prop="stageName" label="阶段" width="100" />
           </el-table>
@@ -120,8 +137,8 @@ onMounted(() => {
 .avatar {
   width: 58px;
   height: 58px;
-  border-radius: 50%;
   flex: none;
+  border-radius: 50%;
   background: linear-gradient(135deg, #5aa2ff, #2f7cf6);
   color: #fff;
   display: flex;

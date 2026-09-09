@@ -3,33 +3,37 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { Role } from '@/types'
-import { adjustCreditAdmin, listAllUsers } from '@/api/admin'
+import { adjustCreditAdmin, listAllUsers, type AdminUserView } from '@/api/admin'
 import { gradeLabel } from '@/utils/grade'
 
 const router = useRouter()
-const users = ref<ReturnType<typeof listAllUsers>>([])
+const users = ref<AdminUserView[]>([])
 const deltas = ref<Record<string, number>>({})
 const loading = ref(true)
 
-function refresh() {
-  users.value = listAllUsers()
-  loading.value = false
+async function refresh() {
+  loading.value = true
+  try {
+    users.value = await listAllUsers()
+  } finally {
+    loading.value = false
+  }
 }
 onMounted(refresh)
 
-function goArchive(u: { role: 'student' | 'teacher'; id: number }, tab: 'profile' | 'orders') {
+function goArchive(u: AdminUserView, tab: 'profile' | 'orders') {
   router.push(`/admin/user/${u.role}/${u.id}${tab === 'orders' ? '?tab=orders' : ''}`)
 }
 
-function apply(u: { role: 'student' | 'teacher'; id: number }) {
+async function apply(u: AdminUserView) {
   const delta = deltas.value[`${u.role}-${u.id}`] ?? 0
   if (!delta) return ElMessage.warning('请输入调整值（正数加、负数减）')
-  adjustCreditAdmin(u.role, u.id, delta)
+  await adjustCreditAdmin(u.role, u.id, u.credit + delta)
   ElMessage.success('已调整')
   refresh()
 }
-function quick(u: { role: 'student' | 'teacher'; id: number }, d: number) {
-  adjustCreditAdmin(u.role, u.id, d)
+async function quick(u: AdminUserView, d: number) {
+  await adjustCreditAdmin(u.role, u.id, u.credit + d)
   ElMessage.success(`已${d > 0 ? '加' : '减'}${Math.abs(d)} 信用分`)
   refresh()
 }

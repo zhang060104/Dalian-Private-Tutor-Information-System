@@ -1,97 +1,140 @@
 // ============================================================================
-// 学生 / 教师资料接口
-// 真实后端：GET /api/students · GET /api/teachers · GET /api/profile · PATCH ...
+// 学生 / 教师资料接口（真实后端）
+//  - GET /api/students · GET /api/teachers · GET /api/profile · GET /api/profile/me
+//  - PATCH /api/profile/me/status(0/1) · POST /api/profile/review(需 captchaToken)
+// 后端 timeTable1..7 → 前端 WeekTimeTables[7]（转换层）
 // ============================================================================
-import type { Profile, Role } from '@/types'
-import { getDb } from '@/data/mock'
-import {
-  rawUser, toProfile, toPrivate, toggleSeeking as mockToggle, submitProfileChange,
-} from '@/data/mockApi'
+import http from './http'
+import type { Profile, Role, WeekTimeTables } from '@/types'
 
-const withSelf = (p: Profile, meRole: Role | null, meId: number | null): Profile => {
-  const isSelf = !!meRole && p.role === meRole && p.id === meId
-  return { ...p, isSelf }
+/** 后端学生/教师/我的资料返回结构（驼峰由 MyBatis map-underscore-to-camel-case 提供） */
+interface ProfileDTO {
+  id: number
+  nickname: string
+  age?: number
+  gender?: string
+  grade: number
+  subject: number
+  description?: string
+  address?: string | null
+  qrcode?: string | null
+  idcard?: string | null
+  certificate?: string | null
+  timeTable1: number
+  timeTable2: number
+  timeTable3: number
+  timeTable4: number
+  timeTable5: number
+  timeTable6: number
+  timeTable7: number
+  status: number
+  credit: number
+  seeking: number
+  isMe?: boolean
+  isSuper?: boolean
 }
 
-/**
- * 获取学生概览列表（只含 status=0 正在寻找家教的；脱敏，不含私密字段/地址）。
- * 支持筛选：grade 精确、subject 位掩码交集、keyword 昵称/简介、stage。
- */
-export async function listStudents(filter?: {
+function ttArrToObject(tt: WeekTimeTables) {
+  return {
+    timeTable1: tt[0],
+    timeTable2: tt[1],
+    timeTable3: tt[2],
+    timeTable4: tt[3],
+    timeTable5: tt[4],
+    timeTable6: tt[5],
+    timeTable7: tt[6],
+  }
+}
+
+function ttFromDto(p: ProfileDTO): WeekTimeTables {
+  return [
+    p.timeTable1,
+    p.timeTable2,
+    p.timeTable3,
+    p.timeTable4,
+    p.timeTable5,
+    p.timeTable6,
+    p.timeTable7,
+  ]
+}
+
+/** DTO → 前端 Profile（不暴露地址给非本人） */
+function dtoToProfile(role: Role, p: ProfileDTO, exposeAddress = false): Profile {
+  return {
+    id: p.id,
+    role,
+    nickname: p.nickname,
+    age: p.age,
+    gender: p.gender as '男' | '女' | undefined,
+    grade: p.grade,
+    subject: p.subject,
+    description: p.description || '',
+    address: exposeAddress ? p.address ?? null : null,
+    credit: p.credit,
+    seeking: !!p.seeking,
+    status: p.status,
+    timeTables: ttFromDto(p),
+    isSelf: !!p.isMe,
+    phoneVisible: !!p.isMe,
+    isSuperAdmin: !!p.isSuper,
+  }
+}
+
+export interface ListFilter {
   grade?: number | null
   subject?: number | null
   keyword?: string
-}): Promise<Profile[]> {
-  // TODO(real): return http.get('/students', { params: filter })
-  const d = getDb()
-  let list = d.students.filter((s) => s.status === 0)
-  if (filter?.grade != null) list = list.filter((s) => s.grade === filter.grade)
-  if (filter?.subject) list = list.filter((s) => (s.subject & (filter.subject as number)) !== 0)
-  if (filter?.keyword) {
-    const k = filter.keyword.trim().toLowerCase()
-    list = list.filter((s) => s.nickname.toLowerCase().includes(k) || s.description.toLowerCase().includes(k))
-  }
-  // 脱敏：对外列表不暴露地址（location 本就 null）
-  return list.map((s) => {
-    const p = toProfile(s, false)
-    delete (p as { address?: string | null }).address
-    return p
-  })
+  [key: string]: unknown
 }
 
-/** 教师概览列表（同学生逻辑） */
-export async function listTeachers(filter?: {
-  grade?: number | null
-  subject?: number | null
-  keyword?: string
-}): Promise<Profile[]> {
-  // TODO(real): return http.get('/teachers', { params: filter })
-  const d = getDb()
-  let list = d.teachers.filter((s) => s.status === 0)
-  if (filter?.grade != null) list = list.filter((s) => s.grade === filter.grade)
-  if (filter?.subject) list = list.filter((s) => (s.subject & (filter.subject as number)) !== 0)
-  if (filter?.keyword) {
-    const k = filter.keyword.trim().toLowerCase()
-    list = list.filter((s) => s.nickname.toLowerCase().includes(k) || s.description.toLowerCase().includes(k))
-  }
-  return list.map((s) => {
-    const p = toProfile(s, false)
-    delete (p as { address?: string | null }).address
-    return p
-  })
+export async function listStudents(filter?: ListFilter): Promise<Profile[]> {
+  const arr = await http.get<ProfileDTO[]>('/api/students', { params: filter || {} })
+  return arr.map((p) => dtoToProfile('student', p, false))
 }
 
-/** 获取某学生/教师的个人主页资料（纯净单人；可带 isSelf 供本人提供修改入口） */
-export async function getPerson(role: 'student' | 'teacher', id: number, meRole: Role | null = null, meId: number | null = null): Promise<Profile> {
-  // TODO(real): return http.get(`/${role === 'student' ? 'students' : 'teachers'}/${id}`)
-  const u = rawUser(role, id)
-  if (!u) throw new Error('用户不存在')
-  return withSelf(toProfile(u), meRole, meId)
+export async function listTeachers(filter?: ListFilter): Promise<Profile[]> {
+  const arr = await http.get<ProfileDTO[]>('/api/teachers', { params: filter || {} })
+  return arr.map((p) => dtoToProfile('teacher', p, false))
 }
 
-/** 获取我的资料（真实后端返回本人含私密字段；mock 取私密字段拼接） */
-export async function getMyProfile(role: Role, id: number): Promise<Profile> {
-  // TODO(real): return http.get('/profile/me')
-  const u = rawUser(role, id)
-  if (!u) throw new Error('用户不存在')
-  const p = toProfile(u, true)
-  return p
+export async function getPerson(
+  role: 'student' | 'teacher',
+  id: number
+): Promise<Profile> {
+  const p = await http.get<ProfileDTO>(
+    `/api/${role === 'student' ? 'students' : 'teachers'}/${id}`
+  )
+  return dtoToProfile(role, p, true)
 }
 
-/** 我的私密资料（个人主页本人查看联系方式/收款码） */
-export async function getMyPrivate(role: Role, id: number) {
-  const u = rawUser(role, id)
-  return u ? toPrivate(u) : null
+export async function getMyProfile(role: Role): Promise<Profile> {
+  const p = await http.get<ProfileDTO>('/api/profile/me', { params: { role } })
+  return dtoToProfile(role, p, true)
 }
 
-/** 切换「正在寻找」状态 0/1 */
-export async function setSeeking(role: Role, id: number): Promise<number> {
-  // TODO(real): return http.post('/profile/toggle-status')
-  return mockToggle(role, id)
+export async function setSeeking(role: Role): Promise<number> {
+  return http.put<number>(`/api/profile/me/status?role=${role}`)
 }
 
-/** 提交个人资料修改（进入管理员审核） */
-export async function requestProfileChange(role: Role, id: number, patch: Partial<Profile>): Promise<void> {
-  // TODO(real): return http.post('/profile/review', { patch })
-  submitProfileChange(role, id, patch)
+/** 提交资料修改申请（进入管理员审核队列） */
+export async function requestProfileChange(
+  role: Role,
+  captchaToken: string,
+  patch: Partial<Profile>
+): Promise<void> {
+  const payload: Record<string, unknown> = { role, captchaToken }
+  if (patch.nickname != null) payload.nickname = patch.nickname
+  if (patch.age != null) payload.age = patch.age
+  if (patch.gender != null) payload.gender = patch.gender
+  if (patch.grade != null) payload.grade = patch.grade
+  if (patch.subject != null) payload.subject = patch.subject
+  if (patch.description != null) payload.description = patch.description
+  if (patch.address != null) payload.address = patch.address
+  if (patch.timeTables) Object.assign(payload, ttArrToObject(patch.timeTables))
+  await http.post('/api/profile/review', payload)
+}
+
+/** 资料修改申请撤回 */
+export async function cancelProfileChange(role: Role, id: number): Promise<void> {
+  await http.delete(`/api/profile/review?role=${role}&id=${id}`)
 }

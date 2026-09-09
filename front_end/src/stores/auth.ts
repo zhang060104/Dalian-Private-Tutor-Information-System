@@ -1,8 +1,11 @@
 // 会话状态：登录态（学生/教师/管理员统一管理）
 import { defineStore } from 'pinia'
 import type { Role } from '@/types'
-import { login as apiLogin, logout as apiLogout, adminLogin as apiAdminLogin } from '@/api/auth'
-import type { LoginPayload, LoginResult } from '@/types'
+import {
+  login as apiLogin,
+  adminLogin as apiAdminLogin,
+  type LoginResultDTO,
+} from '@/api/auth'
 
 const TOKEN_KEY = 'dl_tutor_token'
 const CUR_KEY = 'dl_tutor_current'
@@ -12,6 +15,7 @@ export interface Session {
   role: Role
   id: number
   nickname: string
+  isSuper?: boolean
 }
 
 function loadSession(): Session | null {
@@ -21,6 +25,19 @@ function loadSession(): Session | null {
   } catch {
     return null
   }
+}
+
+function applySession(res: LoginResultDTO): Session {
+  const session: Session = {
+    token: res.token,
+    role: res.role,
+    id: res.id,
+    nickname: res.nickname,
+    isSuper: !!res.isSuper,
+  }
+  localStorage.setItem(TOKEN_KEY, res.token)
+  localStorage.setItem(CUR_KEY, JSON.stringify(session))
+  return session
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -33,38 +50,33 @@ export const useAuthStore = defineStore('auth', {
     role: (s): Role | null => s.session?.role ?? null,
     userId: (s): number | null => s.session?.id ?? null,
     nickname: (s) => s.session?.nickname ?? '',
+    isSuperAdmin: (s) => s.session?.role === 'admin' && !!s.session.isSuper,
   },
   actions: {
-    /** 门户登录（学生/教师），走通用账号体系。 */
-    async login(p: LoginPayload): Promise<LoginResult> {
+    /** 学生/教师登录 */
+    async login(role: Role, phone: string, password: string): Promise<LoginResultDTO> {
       this.loading = true
       try {
-        const res = await apiLogin(p)
-        const session: Session = { token: res.token, role: res.role, id: res.id, nickname: res.nickname }
-        this.session = session
-        localStorage.setItem(TOKEN_KEY, res.token)
-        localStorage.setItem(CUR_KEY, JSON.stringify(session))
+        const res = await apiLogin(role, phone, password)
+        this.session = applySession(res)
         return res
       } finally {
         this.loading = false
       }
     },
-    /** 管理员登录：独立的认证通道与接口，与管理门户 login 完全分离。 */
-    async loginAdmin(account: string, password: string): Promise<LoginResult> {
+    /** 管理员登录：独立通道 */
+    async loginAdmin(account: string, password: string): Promise<LoginResultDTO> {
       this.loading = true
       try {
         const res = await apiAdminLogin(account, password)
-        const session: Session = { token: res.token, role: res.role, id: res.id, nickname: res.nickname }
-        this.session = session
-        localStorage.setItem(TOKEN_KEY, res.token)
-        localStorage.setItem(CUR_KEY, JSON.stringify(session))
+        this.session = applySession(res)
         return res
       } finally {
         this.loading = false
       }
     },
+    /** 仅清本地会话（后端无 /logout 接口） */
     async logout() {
-      await apiLogout()
       this.session = null
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(CUR_KEY)

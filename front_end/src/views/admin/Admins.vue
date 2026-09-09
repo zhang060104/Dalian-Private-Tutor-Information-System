@@ -1,33 +1,41 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { Admin } from '@/types'
 import { useAuthStore } from '@/stores/auth'
-import { listAdmins, createAdmin, deleteAdmin } from '@/api/admin'
+import { listAdmins, createAdmin, deleteAdmin, type AdminDTO } from '@/api/admin'
 
 const auth = useAuthStore()
-const admins = ref<Admin[]>([])
-const isSuper = auth.userId === 0
+const admins = ref<AdminDTO[]>([])
+const loading = ref(true)
+const isSuper = auth.isSuperAdmin
 
-function refresh() {
-  admins.value = listAdmins()
+async function refresh() {
+  loading.value = true
+  try {
+    admins.value = await listAdmins()
+  } finally {
+    loading.value = false
+  }
 }
 onMounted(refresh)
 
 const dlg = ref(false)
 const form = reactive({ nickname: '', phone: '', password: '' })
-function submit() {
-  if (!form.nickname || !form.phone || !form.password) return ElMessage.warning('请完整填写')
-  createAdmin(form.nickname, form.phone, form.password)
+async function submit() {
+  if (!form.nickname || !form.phone || !form.password) {
+    ElMessage.warning('请完整填写')
+    return
+  }
+  await createAdmin(form)
   ElMessage.success('已创建管理员')
   dlg.value = false
   form.nickname = form.phone = form.password = ''
   refresh()
 }
-function del(a: Admin) {
-  ElMessageBox.confirm(`确定删除管理员「${a.nickname}」？`, '删除', { type: 'warning' })
-    .then(() => {
-      deleteAdmin(a.id)
+async function del(a: AdminDTO) {
+  await ElMessageBox.confirm(`确定删除管理员「${a.nickname}」？`, '删除', { type: 'warning' })
+    .then(async () => {
+      await deleteAdmin(a.id)
       ElMessage.success('已删除')
       refresh()
     })
@@ -36,7 +44,7 @@ function del(a: Admin) {
 </script>
 
 <template>
-  <div>
+  <div v-loading="loading">
     <div class="flex-between mb-16">
       <h2 style="font-size: 18px">管理员管理</h2>
       <div class="flex gap-8">
@@ -45,16 +53,23 @@ function del(a: Admin) {
       </div>
     </div>
     <el-alert type="warning" :closable="false" show-icon class="mb-16">
-      ID 为 0 的超级管理员不可删除。
+      超级管理员（isSuper=true）不可被删除。
     </el-alert>
     <el-table :data="admins" border stripe>
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="nickname" label="昵称" min-width="160" />
       <el-table-column prop="phone" label="账号 / 手机号" min-width="160" />
-      <el-table-column label="角色" width="140"><template #default="{ row }"><el-tag v-if="row.id === 0" type="danger">超级管理员</el-tag><el-tag v-else type="info" effect="plain">管理员</el-tag></template></el-table-column>
+      <el-table-column label="角色" width="140">
+        <template #default="{ row }">
+          <el-tag v-if="row.isSuper" type="danger">超级管理员</el-tag>
+          <el-tag v-else type="info" effect="plain">管理员</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
-          <el-button size="small" type="danger" text :disabled="row.id === 0 || !isSuper" @click="del(row)">删除</el-button>
+          <el-button size="small" type="danger" text :disabled="row.isSuper || !isSuper" @click="del(row)">
+            删除
+          </el-button>
         </template>
       </el-table-column>
     </el-table>

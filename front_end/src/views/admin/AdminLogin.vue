@@ -38,7 +38,7 @@ async function submit() {
         <el-button type="primary" size="large" class="btn" :loading="auth.loading" @click="submit">登 录</el-button>
       </el-form>
       <el-alert type="info" :closable="false" class="tip">
-        演示管理员：超级管理员 <b>admin</b> / <b>admin123</b>
+        超管 <b>13800000000</b> / <b>123456</b>　·　运营 <b>13800000009</b> / <b>123456</b>
       </el-alert>
     </el-card>
   </div>

@@ -17,7 +17,12 @@ const oid = Number(route.params.id)
 const role = (auth.role ?? 'teacher') as 'student' | 'teacher'
 
 const order = ref<Order | null>(null)
-const form = reactive({ subjects: [] as number[], hourlyWage: 0, description: '', timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables })
+const form = reactive({
+  subjects: [] as number[],
+  hourlyWage: 0,
+  description: '',
+  timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables,
+})
 const captchaOk = ref(false)
 const saving = ref(false)
 const loading = ref(true)
@@ -26,9 +31,10 @@ async function load() {
   loading.value = true
   try {
     order.value = await getOrder(oid, role)
-    // 位掩码解码为已选科目下标数组（多选）
-    form.subjects = decodeSubjects(order.value.subject).map((name) => SUBJECTS.indexOf(name)).filter((i) => i >= 0)
-    form.hourlyWage = order.value.hourly_wage
+    form.subjects = decodeSubjects(order.value.subject)
+      .map((name) => SUBJECTS.indexOf(name))
+      .filter((i) => i >= 0)
+    form.hourlyWage = order.value.hourlyWage
     form.description = order.value.description
     form.timeTables = [...order.value.timeTables] as WeekTimeTables
   } catch {
@@ -48,16 +54,14 @@ async function submitChange() {
   if (!captchaOk.value) return ElMessage.warning('请先完成滑块验证')
   saving.value = true
   try {
-    await submitOrderInfo(order.value.id, role, {
+    await submitOrderInfo(order.value.id, {
       subject: encodeSubjects(form.subjects),
-      hourly_wage: form.hourlyWage,
+      hourlyWage: form.hourlyWage,
       description: form.description,
       timeTables: form.timeTables,
     })
     ElMessage.success('修改已提交，等待对方审核')
     router.replace(`/order/${oid}`)
-  } catch (e) {
-    ElMessage.error((e as Error).message || '提交失败')
   } finally {
     saving.value = false
   }
@@ -68,11 +72,9 @@ async function confirmAsReviewer() {
   if (!order.value) return
   saving.value = true
   try {
-    await confirmOrderInfo(order.value.id, role)
+    await confirmOrderInfo(order.value.id)
     ElMessage.success('已确认，进入费用缴纳')
     router.replace(`/order/${oid}`)
-  } catch (e) {
-    ElMessage.error((e as Error).message || '操作失败')
   } finally {
     saving.value = false
   }

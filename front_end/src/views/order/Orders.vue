@@ -11,13 +11,14 @@ import { orderStatus } from '@/utils/order'
 const auth = useAuthStore()
 const router = useRouter()
 const role = (auth.role ?? 'teacher') as 'student' | 'teacher'
-const id = auth.userId!
 
 const orders = ref<Order[]>([])
 const loading = ref(true)
 const filter = ref<'all' | 'active'>('active')
 
-const visible = computed(() => (filter.value === 'all' ? orders.value : orders.value.filter((o) => o.status !== 12)))
+const visible = computed(() =>
+  filter.value === 'all' ? orders.value : orders.value.filter((o) => o.status !== 12)
+)
 
 function open(o: Order) {
   router.push(`/order/${o.id}`)
@@ -25,18 +26,24 @@ function open(o: Order) {
 async function load() {
   loading.value = true
   try {
-    orders.value = await listMyOrders(role, id, false)
+    orders.value = await listMyOrders(role, filter.value === 'all')
   } catch {
-    ElMessage.error('加载订单失败')
+    // http 已弹错
   } finally {
     loading.value = false
   }
+}
+async function onFilterChange(v: 'all' | 'active') {
+  filter.value = v
+  await load()
 }
 onMounted(load)
 
 function statusTag(o: Order) {
   const m = orderStatus(o.status)
-  const map: Record<string, string> = { success: '9', primary: '8,2,6,7', info: '12', warning: '5,10,11' }
+  const map: Record<string, string> = {
+    success: '9', primary: '8,2,6,7', info: '12', warning: '5,10,11',
+  }
   for (const [t, s] of Object.entries(map)) {
     if (s.split(',').includes(String(o.status))) return t
   }
@@ -48,7 +55,7 @@ function statusTag(o: Order) {
   <div class="page">
     <div class="page-header">
       <h1 class="page-title">我的订单</h1>
-      <el-segmented v-model="filter" :options="[{ label: '进行中', value: 'active' }, { label: '全部', value: 'all' }]" />
+      <el-segmented v-model="filter" :options="[{ label: '进行中', value: 'active' }, { label: '全部', value: 'all' }]" @change="onFilterChange" />
     </div>
 
     <el-card shadow="never" v-loading="loading">
@@ -63,7 +70,7 @@ function statusTag(o: Order) {
             <span class="credit-pill">信用 {{ o.peer?.credit }}</span>
           </div>
           <div class="info muted">
-            科目 {{ decodeSubjects(o.subject).join('、') || '—' }} · 时薪 ¥{{ o.hourly_wage }}/h
+            科目 {{ decodeSubjects(o.subject).join('、') || '—' }} · 时薪 ¥{{ o.hourlyWage }}/h
           </div>
           <div class="desc">{{ o.description }}</div>
         </div>

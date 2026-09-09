@@ -16,7 +16,6 @@ import SliderCaptcha from '@/components/SliderCaptcha.vue'
 const auth = useAuthStore()
 const router = useRouter()
 const meRole = (auth.role ?? 'teacher') as 'student' | 'teacher'
-const meId = auth.userId!
 
 const me = ref<Profile | null>(null)
 const orders = ref<Order[]>([])
@@ -30,14 +29,14 @@ const edit = reactive({
   grade: undefined as number | undefined, subjects: [] as number[], description: '',
   address: '', timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables,
 })
-const captchaOk = ref(false)
+const captchaToken = ref<string>('')
 const saving = ref(false)
 
 async function load() {
   loading.value = true
   try {
-    me.value = await getMyProfile(meRole, meId)
-    orders.value = await listMyOrders(meRole, meId)
+    me.value = await getMyProfile(meRole)
+    orders.value = await listMyOrders(meRole, true)
   } finally {
     loading.value = false
   }
@@ -65,33 +64,31 @@ function openEdit() {
   edit.description = me.value.description
   edit.address = me.value.address ?? ''
   edit.timeTables = [...me.value.timeTables] as WeekTimeTables
-  captchaOk.value = false
+  captchaToken.value = ''
   editOpen.value = true
 }
 
 async function submitEdit() {
-  if (!captchaOk.value) return ElMessage.warning('请先完成滑块验证')
+  if (!captchaToken.value) return ElMessage.warning('请先完成滑块验证')
   if (!edit.subjects.length) return ElMessage.warning('请至少选择一项')
   let subject = 0
   edit.subjects.forEach((i) => (subject |= 1 << i))
   saving.value = true
   try {
-    await requestProfileChange(meRole, meId, {
+    await requestProfileChange(meRole, captchaToken.value, {
       age: edit.age ?? null, gender: edit.gender, grade: edit.grade,
       subject, description: edit.description, address: edit.address || null,
       timeTables: edit.timeTables,
     })
     ElMessage.success('修改已提交，待管理员审核通过后生效')
     editOpen.value = false
-  } catch (e) {
-    ElMessage.error((e as Error).message || '提交失败')
   } finally {
     saving.value = false
   }
 }
 
 async function toggleStatus() {
-  const s = await setSeeking(meRole, meId)
+  const s = await setSeeking(meRole)
   ElMessage.success(s === 1 ? '已停止寻找，不再出现在匹配列表' : '已恢复寻找')
   load()
 }
@@ -183,11 +180,11 @@ onMounted(load)
         <el-form-item label="个人简介"><el-input v-model="edit.description" type="textarea" :rows="3" /></el-form-item>
         <el-form-item label="所在区域"><el-input v-model="edit.address" /></el-form-item>
         <el-form-item label="空闲时间"><ScheduleEditor v-model="edit.timeTables" /></el-form-item>
-        <el-form-item label="安全验证"><SliderCaptcha @success="captchaOk = true" /></el-form-item>
+        <el-form-item label="安全验证"><SliderCaptcha @success="(t: string) => captchaToken = t" @reset="captchaToken = ''" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editOpen = false">取消</el-button>
-        <el-button type="primary" :disabled="!captchaOk" :loading="saving" @click="submitEdit">提交审核</el-button>
+        <el-button type="primary" :disabled="!captchaToken" :loading="saving" @click="submitEdit">提交审核</el-button>
       </template>
     </el-dialog>
   </div>

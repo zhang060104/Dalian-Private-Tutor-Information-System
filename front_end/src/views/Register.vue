@@ -2,83 +2,146 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules, type UploadUserFile } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
-import { registerUser } from '@/api/auth'
+import http from '@/api/http'
+import { register, type RegisterPayloadDTO } from '@/api/auth'
 import { GRADE_LEVELS, TEACHER_GRADE_LEVELS } from '@/utils/grade'
-import { SUBJECTS } from '@/utils/subject'
+import { encodeSubjects, SUBJECTS } from '@/utils/subject'
 import type { WeekTimeTables } from '@/types'
 
 const router = useRouter()
+
 const formRef = ref<FormInstance>()
 const role = ref<'student' | 'teacher'>('teacher')
 
 const form = reactive({
-  nickname: '', password: '', confirm: '', phone: '',
-  age: undefined as number | undefined, gender: undefined as '男' | '女' | undefined,
+  nickname: '',
+  password: '',
+  confirm: '',
+  phone: '',
+  age: undefined as number | undefined,
+  gender: undefined as '男' | '女' | undefined,
   grade: undefined as number | undefined,
   subjects: [] as number[],
   description: '',
   address: '',
   timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables,
-  // 图片：mock 存占位路径
-  QRcode: '', IDcard: '', certificate: '',
+  qrcode: '',
+  idcard: '',
+  certificate: '',
 })
 
-const captchaOk = ref(false)
+const captchaToken = ref<string>('')
+const uploading = ref<Record<string, boolean>>({})
 
-const gradeOptions = computed(() => (role.value === 'teacher' ? TEACHER_GRADE_LEVELS : GRADE_LEVELS))
-const gradeLabelText = computed(() => (role.value === 'teacher' ? '本人年级（在读大学生 / 已毕业）' : '就读 / 求学年级'))
+const gradeOptions = computed(() =>
+  role.value === 'teacher' ? TEACHER_GRADE_LEVELS : GRADE_LEVELS
+)
+const gradeLabelText = computed(() =>
+  role.value === 'teacher' ? '本人年级（在读大学生 / 已毕业）' : '就读 / 求学年级'
+)
 
 const rules = reactive<FormRules>({
   nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
-  phone: [{ required: true, pattern: /^1\d{10}$/, message: '请输入 11 位手机号', trigger: 'blur' }],
+  phone: [
+    { required: true, pattern: /^1\d{10}$/, message: '请输入 11 位手机号', trigger: 'blur' },
+  ],
   password: [{ required: true, min: 6, message: '密码至少 6 位', trigger: 'blur' }],
-  confirm: [{
-    validator: (_r, v, cb) => (v === form.password ? cb() : cb(new Error('两次密码不一致'))),
-    trigger: 'blur',
-  }],
+  confirm: [
+    {
+      validator: (_r, v, cb) => (v === form.password ? cb() : cb(new Error('两次密码不一致'))),
+      trigger: 'blur',
+    },
+  ],
   grade: [{ required: true, message: '请选择年级', trigger: 'change' }],
-  QRcode: [{ required: true, message: '请上传收款码截图（便于收取费用）', trigger: 'change' }],
-  IDcard: [{ required: true, message: '请上传身份证人像面（实名认证）', trigger: 'change' }],
+  qrcode: [{ required: true, message: '请上传收款码截图', trigger: 'change' }],
+  idcard: [{ required: true, message: '请上传身份证人像面', trigger: 'change' }],
 })
 
-/** mock 上传：真实环境替换为 multipart 上传返回 url */
-function onFile(field: 'QRcode' | 'IDcard' | 'certificate', file: UploadUserFile) {
-  form[field] = `/mock/${field}/${Date.now()}-${file.name}`
+/** 真实上传：multipart 到 /api/upload；返回服务端 url */
+async function uploadImage(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await http.post<{ url: string }>('/api/upload', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.url
 }
+
+async function onFile(
+  field: 'qrcode' | 'idcard' | 'certificate',
+  uploadFile: UploadUserFile
+) {
+  const raw = uploadFile.raw
+  if (!raw) {
+    ElMessage.error('请选择有效的图片文件')
+    return
+  }
+  uploading.value[field] = true
+  try {
+    form[field] = await uploadImage(raw)
+  } catch (e) {
+    // http 拦截器已弹错
+  } finally {
+    uploading.value[field] = false
+  }
+}
+
 function onFileError() {
   ElMessage.error('请选择图片文件')
 }
-function setCaptcha() {
-  captchaOk.value = true
+
+function onCaptcha(token: string) {
+  captchaToken.value = token
+}
+function onCaptchaReset() {
+  captchaToken.value = ''
 }
 
 async function submit() {
   await formRef.value?.validate()
-  if (!captchaOk.value) {
+  if (!captchaToken.value) {
     ElMessage.warning('请先完成滑块验证')
     return
   }
   if (!form.subjects.length) {
-    ElMessage.warning(role.value === 'teacher' ? '请至少选择一个可授科目' : '请至少选择一个需要的科目')
+    ElMessage.warning(
+      role.value === 'teacher' ? '请至少选择一个可授科目' : '请至少选择一个需要的科目'
+    )
     return
   }
-  // 编码科目位掩码
-  let subject = 0
-  form.subjects.forEach((i) => (subject |= 1 << i))
+  const subject = encodeSubjects(form.subjects)
+  const payload: RegisterPayloadDTO = {
+    role: role.value,
+    phone: form.phone,
+    password: form.password,
+    captchaToken: captchaToken.value,
+    nickname: form.nickname,
+    grade: form.grade!,
+    subject,
+    description: form.description || undefined,
+    address: form.address || undefined,
+    age: form.age ?? null as unknown as number,
+    gender: form.gender,
+    qrcode: form.qrcode,
+    idcard: form.idcard,
+    certificate: role.value === 'teacher' ? form.certificate : undefined,
+    timeTable1: form.timeTables[0],
+    timeTable2: form.timeTables[1],
+    timeTable3: form.timeTables[2],
+    timeTable4: form.timeTables[3],
+    timeTable5: form.timeTables[4],
+    timeTable6: form.timeTables[5],
+    timeTable7: form.timeTables[6],
+  }
   try {
-    await registerUser({
-      role: role.value, nickname: form.nickname, password: form.password, phone: form.phone,
-      QRcode: form.QRcode, IDcard: form.IDcard,
-      certificate: role.value === 'teacher' ? form.certificate : undefined,
-      grade: form.grade, subject, age: form.age ?? null, gender: form.gender,
-      description: form.description, address: form.address || null,
-    })
+    await register(payload)
     ElMessage.success('入驻申请已提交，请等待管理员审核通过后登录')
     router.push('/login')
   } catch (e) {
-    ElMessage.error((e as Error).message || '提交失败')
+    // http 已弹错
   }
 }
 
@@ -98,7 +161,14 @@ function onSubjectChange(v: number[]) {
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" size="large">
         <el-form-item label="我是">
-          <el-segmented v-model="role" :options="[{ label: '老师', value: 'teacher' }, { label: '学生', value: 'student' }]" block />
+          <el-segmented
+            v-model="role"
+            :options="[
+              { label: '老师', value: 'teacher' },
+              { label: '学生', value: 'student' },
+            ]"
+            block
+          />
         </el-form-item>
 
         <el-form-item label="昵称" prop="nickname">
@@ -141,7 +211,10 @@ function onSubjectChange(v: number[]) {
           </el-select>
         </el-form-item>
 
-        <el-form-item :label="role === 'teacher' ? '可授科目' : '需要辅导的科目'" required>
+        <el-form-item
+          :label="role === 'teacher' ? '可授科目' : '需要辅导的科目'"
+          required
+        >
           <el-checkbox-group :model-value="subjectModel" @change="onSubjectChange">
             <el-checkbox v-for="(s, i) in SUBJECTS" :key="s" :value="i">{{ s }}</el-checkbox>
           </el-checkbox-group>
@@ -159,30 +232,59 @@ function onSubjectChange(v: number[]) {
         </el-form-item>
 
         <el-divider content-position="left">实名与收款凭证</el-divider>
-        <el-form-item label="收款码截图（老师必传 / 学生收款也建议传）" prop="QRcode">
-          <el-upload action="#" :auto-upload="false" :limit="1" :show-file-list="true" accept="image/*" list-type="picture-card"
-            :on-change="(f: UploadUserFile) => onFile('QRcode', f)" :on-error="onFileError" :on-exceed="() => ElMessage.warning('仅一张')">
+        <el-form-item label="收款码截图（老师必传 / 学生收款也建议传）" prop="qrcode">
+          <el-upload
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            :show-file-list="true"
+            accept="image/*"
+            list-type="picture-card"
+            :on-change="(f: UploadUserFile) => onFile('qrcode', f)"
+            :on-error="onFileError"
+            :on-exceed="() => ElMessage.warning('仅一张')"
+          >
             <el-icon><Plus /></el-icon>
           </el-upload>
         </el-form-item>
-        <el-form-item label="身份证人像面（实名认证）" prop="IDcard">
-          <el-upload action="#" :auto-upload="false" :limit="1" :show-file-list="true" accept="image/*" list-type="picture-card"
-            :on-change="(f: UploadUserFile) => onFile('IDcard', f)" :on-error="onFileError" :on-exceed="() => ElMessage.warning('仅一张')">
+        <el-form-item label="身份证人像面（实名认证）" prop="idcard">
+          <el-upload
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            :show-file-list="true"
+            accept="image/*"
+            list-type="picture-card"
+            :on-change="(f: UploadUserFile) => onFile('idcard', f)"
+            :on-error="onFileError"
+            :on-exceed="() => ElMessage.warning('仅一张')"
+          >
             <el-icon><Plus /></el-icon>
           </el-upload>
         </el-form-item>
         <el-form-item v-if="role === 'teacher'" label="教师资格 / 资质证明（选填）">
-          <el-upload action="#" :auto-upload="false" :limit="1" :show-file-list="true" accept="image/*" list-type="picture-card"
-            :on-change="(f: UploadUserFile) => onFile('certificate', f)" :on-error="onFileError" :on-exceed="() => ElMessage.warning('仅一张')">
+          <el-upload
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            :show-file-list="true"
+            accept="image/*"
+            list-type="picture-card"
+            :on-change="(f: UploadUserFile) => onFile('certificate', f)"
+            :on-error="onFileError"
+            :on-exceed="() => ElMessage.warning('仅一张')"
+          >
             <el-icon><Plus /></el-icon>
           </el-upload>
         </el-form-item>
 
         <el-form-item label="安全验证">
-          <SliderCaptcha @success="setCaptcha" />
+          <SliderCaptcha @success="onCaptcha" @reset="onCaptchaReset" />
         </el-form-item>
 
-        <el-button type="primary" size="large" class="submit" @click="submit">提交入驻申请</el-button>
+        <el-button type="primary" size="large" class="submit" @click="submit">
+          提交入驻申请
+        </el-button>
       </el-form>
     </el-card>
   </div>

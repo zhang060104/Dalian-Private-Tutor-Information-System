@@ -2,14 +2,13 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { Profile, Role, WeekTimeTables } from '@/types'
+import type { Profile, Role } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { getPerson } from '@/api/users'
 import { createOrder } from '@/api/orders'
 import { gradeLabel } from '@/utils/grade'
-import { decodeSubjects, encodeSubjects, SUBJECTS } from '@/utils/subject'
+import { decodeSubjects, SUBJECTS } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
-import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
 
 const route = useRoute()
@@ -23,7 +22,6 @@ const meRole = computed(() => auth.role as 'student' | 'teacher' | null)
 const profile = ref<Profile | null>(null)
 const loading = ref(true)
 
-// 我是否就是浏览对象（本人 → 跳转 /me 展示订单）
 const isSelf = computed(() => !!profile.value && profile.value.isSelf)
 
 const canResume = computed(() => meRole.value === 'teacher' && role === 'student' && !isSelf.value)
@@ -31,27 +29,25 @@ const canTrial = computed(() => meRole.value === 'student' && role === 'teacher'
 
 // 发起匹配弹窗
 const dlg = ref(false)
-const form = reactive({ subjects: [] as number[], hourlyWage: 100, timeTables: [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables })
-const captchaOk = ref(false)
+const form = reactive({ subjects: [] as number[] })
+const captchaToken = ref<string>('')
 const submitting = ref(false)
 
 function openDialog() {
-  captchaOk.value = false
+  captchaToken.value = ''
   form.subjects = []
-  form.timeTables = [0, 0, 0, 0, 0, 0, 0] as WeekTimeTables
   dlg.value = true
 }
 async function submitMatch() {
   if (!form.subjects.length) return ElMessage.warning('请至少选择一个匹配科目')
+  if (!captchaToken.value) return ElMessage.warning('请先完成滑块验证')
   if (!meRole.value) return
   submitting.value = true
   try {
-    await createOrder(canResume.value ? 'resume' : 'trial', meRole.value, auth.userId!, id, encodeSubjects(form.subjects), form.hourlyWage)
+    await createOrder(id, captchaToken.value)
     ElMessage.success(canResume.value ? '简历已投递' : '免费试课邀请已发起')
     dlg.value = false
     router.push('/orders')
-  } catch (e) {
-    ElMessage.error((e as Error).message || '发起失败')
   } finally {
     submitting.value = false
   }
@@ -68,7 +64,7 @@ function timeText(): string {
 
 onMounted(async () => {
   try {
-    profile.value = await getPerson(role, id, auth.role, auth.userId)
+    profile.value = await getPerson(role, id)
     if (profile.value.isSelf) router.replace('/me')
   } catch {
     ElMessage.error('加载失败，用户可能不存在')
@@ -142,19 +138,16 @@ function back() {
             <el-option v-for="(s, i) in SUBJECTS" :key="s" :label="s" :value="i" />
           </el-select>
         </el-form-item>
-        <el-form-item label="授课时薪（元/小时）">
-          <el-input-number v-model="form.hourlyWage" :min="30" :step="10" style="width: 200px" />
-        </el-form-item>
-        <el-form-item label="可授课时段（双方时间需匹配）">
-          <ScheduleEditor v-model="form.timeTables" />
-        </el-form-item>
+        <el-alert type="info" :closable="false" show-icon class="mb-8">
+          提交后将自动带入对方需求/可授时间交集，订单详情中双方再协商确认。
+        </el-alert>
         <el-form-item label="安全验证">
-          <SliderCaptcha @success="captchaOk = true" />
+          <SliderCaptcha @success="(t: string) => captchaToken = t" @reset="captchaToken = ''" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dlg = false">取消</el-button>
-        <el-button type="primary" :disabled="!captchaOk" :loading="submitting" @click="submitMatch">
+        <el-button type="primary" :disabled="!captchaToken" :loading="submitting" @click="submitMatch">
           确认{{ canResume ? '投递' : '发起试课' }}
         </el-button>
       </template>

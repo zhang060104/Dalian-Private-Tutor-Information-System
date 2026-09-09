@@ -2,9 +2,21 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type UploadUserFile } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import type { Order, Role } from '@/types'
 import { useAuthStore } from '@/stores/auth'
-import { getOrder, acceptInitial, confirmOrderInfo, cancelOrder, uploadPayment, passTrial, requestClose, agreeClose, arbitrate } from '@/api/orders'
+import http from '@/api/http'
+import {
+  getOrder,
+  acceptInitial,
+  confirmOrderInfo,
+  cancelOrder,
+  uploadPayment,
+  passTrial,
+  requestClose,
+  agreeClose,
+  arbitrate,
+} from '@/api/orders'
 import { decodeSubjects } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
 import { orderStatus, myActions } from '@/utils/order'
@@ -28,9 +40,26 @@ function meta() {
 }
 function stageText(s: string | undefined): string {
   const map: Record<string, string> = {
-    resume: '简历匹配', confirm: '信息确认', payment: '费用缴纳', trial: '试课', active: '授课服务', closing: '结单', closed: '已结束', dispute: '仲裁',
+    resume: '简历匹配',
+    confirm: '信息确认',
+    payment: '费用缴纳',
+    trial: '试课',
+    active: '授课服务',
+    closing: '结单',
+    closed: '已结束',
+    dispute: '仲裁',
   }
   return s ? map[s] ?? s : ''
+}
+
+/** 真实上传：multipart 到 /api/upload，返回 url */
+async function uploadOne(file: File): Promise<string> {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await http.post<{ url: string }>('/api/upload', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.url
 }
 
 // 缴费
@@ -39,13 +68,29 @@ const payKind = ref<'teaDeposit' | 'stuDeposit' | 'infoFee'>('teaDeposit')
 const payFile = ref<UploadUserFile | null>(null)
 const payCaptcha = ref(false)
 
-function depositKinds(): { kind: 'teaDeposit' | 'stuDeposit' | 'infoFee'; label: string; amount: number; done: boolean }[] {
+function depositKinds(): {
+  kind: 'teaDeposit' | 'stuDeposit' | 'infoFee'
+  label: string
+  amount: number
+  done: boolean
+}[] {
   const o = order.value!
-  const list = [] as { kind: 'teaDeposit' | 'stuDeposit' | 'infoFee'; label: string; amount: number; done: boolean }[]
-  if (isStudent) list.push({ kind: 'stuDeposit', label: '学生定金', amount: o.hourly_wage, done: (o.verification & 2) === 2 })
-  else {
-    list.push({ kind: 'teaDeposit', label: '教师定金', amount: o.hourly_wage, done: (o.verification & 1) === 1 })
-    list.push({ kind: 'infoFee', label: '信息费（首周）', amount: o.infoFee || o.hourly_wage * 2, done: (o.verification & 4) === 4 })
+  const list = [] as {
+    kind: 'teaDeposit' | 'stuDeposit' | 'infoFee'
+    label: string
+    amount: number
+    done: boolean
+  }[]
+  if (isStudent) {
+    list.push({ kind: 'stuDeposit', label: '学生定金', amount: o.hourlyWage, done: (o.verification & 2) === 2 })
+  } else {
+    list.push({ kind: 'teaDeposit', label: '教师定金', amount: o.hourlyWage, done: (o.verification & 1) === 1 })
+    list.push({
+      kind: 'infoFee',
+      label: '信息费（首周）',
+      amount: o.infoFee || o.hourlyWage * 2,
+      done: (o.verification & 4) === 4,
+    })
   }
   return list
 }
@@ -57,17 +102,20 @@ function openPay(kind: 'teaDeposit' | 'stuDeposit' | 'infoFee') {
 }
 async function submitPay() {
   if (!order.value) return
-  if (!payFile.value) return ElMessage.warning('请上传支付交易截图')
+  if (!payFile.value?.raw) return ElMessage.warning('请上传支付交易截图')
   if (!payCaptcha.value) return ElMessage.warning('请完成滑块验证')
   acting.value = true
   try {
-    const url = `/mock/pay/${payKind.value}/${Date.now()}-${payFile.value.name}`
-    await uploadPayment(order.value.id, role, payKind.value, url)
+    const url = await uploadOne(payFile.value.raw)
+    const kindMap: Record<typeof payKind.value, 'depositTea' | 'depositStu' | 'infoFee'> = {
+      teaDeposit: 'depositTea',
+      stuDeposit: 'depositStu',
+      infoFee: 'infoFee',
+    }
+    await uploadPayment(order.value.id, kindMap[payKind.value], url)
     ElMessage.success('已上传，等待管理员核验')
     payDlg.value = false
     reload()
-  } catch (e) {
-    ElMessage.error((e as Error).message || '上传失败')
   } finally {
     acting.value = false
   }
@@ -80,8 +128,6 @@ async function doAction(fn: () => Promise<void>, msg: string) {
     await fn()
     ElMessage.success(msg)
     reload()
-  } catch (e) {
-    ElMessage.error((e as Error).message || '操作失败')
   } finally {
     acting.value = false
   }
@@ -89,12 +135,12 @@ async function doAction(fn: () => Promise<void>, msg: string) {
 function onPrimary() {
   const o = order.value!
   const st = o.status
-  if (st === 0 || st === 1) return doAction(() => acceptInitial(o.id, role), '已接受，进入订单信息确认')
-  if (st === 3 || st === 4) return doAction(() => confirmOrderInfo(o.id, role), '已确认订单信息，进入费用缴纳')
-  if (st === 7 && !isStudent) return doAction(() => passTrial(o.id, role), '试课通过，正式进入授课')
-  if (st === 8 && isStudent) return doAction(() => passTrial(o.id, role), '试课通过，正式进入授课')
-  if (st === 10 && isStudent) return doAction(() => agreeClose(o.id, role), '已同意结单')
-  if (st === 11 && !isStudent) return doAction(() => agreeClose(o.id, role), '已同意结单')
+  if (st === 0 || st === 1) return doAction(() => acceptInitial(o.id), '已接受，进入订单信息确认')
+  if (st === 3 || st === 4) return doAction(() => confirmOrderInfo(o.id), '已确认订单信息，进入费用缴纳')
+  if (st === 7 && !isStudent) return doAction(() => passTrial(o.id), '试课通过，正式进入授课')
+  if (st === 8 && isStudent) return doAction(() => passTrial(o.id), '试课通过，正式进入授课')
+  if (st === 10 && isStudent) return doAction(() => agreeClose(o.id), '已同意结单')
+  if (st === 11 && !isStudent) return doAction(() => agreeClose(o.id), '已同意结单')
 }
 
 // 仲裁
@@ -108,11 +154,15 @@ async function submitArbitration() {
   if (!arbCaptcha.value) return ElMessage.warning('请完成滑块验证')
   acting.value = true
   try {
-    await arbitrate(order.value.id, role, arbText.value, arbEvidence.value.map((f) => `/mock/evidence/${Date.now()}-${f.name}`))
+    const urls: string[] = []
+    for (const f of arbEvidence.value) {
+      if (f.raw) urls.push(await uploadOne(f.raw))
+    }
+    await arbitrate(order.value.id, arbText.value, urls)
     ElMessage.success('已提交仲裁申请')
     arbDlg.value = false
-  } catch (e) {
-    ElMessage.error((e as Error).message || '提交失败')
+    arbEvidence.value = []
+    arbText.value = ''
   } finally {
     acting.value = false
   }
@@ -163,8 +213,8 @@ onMounted(async () => {
             {{ order.peer?.nickname }}（{{ order.peer?.role === 'teacher' ? '老师' : '学生' }}）
           </el-descriptions-item>
           <el-descriptions-item label="授课科目">{{ decodeSubjects(order.subject).join('、') || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="时薪">{{ order.hourly_wage }} 元/小时</el-descriptions-item>
-          <el-descriptions-item label="信息费(教师缴)">¥{{ order.infoFee || order.hourly_wage * 2 }}</el-descriptions-item>
+          <el-descriptions-item label="时薪">{{ order.hourlyWage }} 元/小时</el-descriptions-item>
+          <el-descriptions-item label="信息费(教师缴)">¥{{ order.infoFee || order.hourlyWage * 2 }}</el-descriptions-item>
           <el-descriptions-item label="授课时间" :span="2"><span class="tp">{{ timeText() }}</span></el-descriptions-item>
           <el-descriptions-item label="订单说明" :span="2">{{ order.description }}</el-descriptions-item>
           <el-descriptions-item v-if="order.visibleContact" label="对方联系方式" :span="2">
@@ -200,8 +250,8 @@ onMounted(async () => {
         <div class="acts">
           <el-button v-if="actions.primary" type="primary" size="large" :loading="acting" @click="onPrimary">{{ actions.primary }}</el-button>
           <el-button v-if="actions.canEditInfo" size="large" @click="goEdit">修改订单信息</el-button>
-          <el-button v-if="actions.canClose" size="large" type="warning" plain @click="doAction(() => requestClose(order!.id, role), '已发起结单请求，等待对方同意')">发起结单</el-button>
-          <el-button v-if="actions.canPassTrial && order.status === 6" size="large" type="success" @click="doAction(() => passTrial(order!.id, role), '已标记试课通过，等待对方确认')">试课通过</el-button>
+          <el-button v-if="actions.canClose" size="large" type="warning" plain @click="doAction(() => requestClose(order!.id), '已发起结单请求，等待对方同意')">发起结单</el-button>
+          <el-button v-if="actions.canPassTrial && order.status === 6" size="large" type="success" @click="doAction(() => passTrial(order!.id), '已标记试课通过，等待对方确认')">试课通过</el-button>
           <el-button v-if="actions.canArbitrate" size="large" type="danger" plain @click="arbDlg = true">申请毁约仲裁</el-button>
           <el-button v-if="actions.canCancel" size="small" text type="danger" @click="doAction(() => cancelOrder(order!.id), '订单已取消')">取消订单</el-button>
           <el-button v-if="actions.closed" size="large" type="info" disabled>订单已结束</el-button>

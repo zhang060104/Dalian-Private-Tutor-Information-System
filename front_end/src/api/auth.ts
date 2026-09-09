@@ -1,34 +1,53 @@
-// ============================================================================
-// 认证接口（Auth）
-// 真实后端：POST /api/auth/login · POST /api/auth/register · POST /api/auth/logout
-// 当前实现返回 mock。切换真实后端仅需替换本文件函数体。
-// ============================================================================
-import type { LoginPayload, LoginResult, RegisterPayload } from '@/types'
-import { mockAdminLogin, mockLogin } from '@/data/mock'
-import { register as mockRegister } from '@/data/mockApi'
+import http from './http'
+import type { Role } from '@/types'
 
-/** 登录（学生/教师）。角色由前端登录页 tab 选择。 */
-export async function login(p: LoginPayload): Promise<LoginResult> {
-  // TODO(real): return http.post('/auth/login', p)
-  return mockLogin(p)
+/** 后端登录返回 data 字段（驼峰已统一） */
+export interface LoginResultDTO {
+  token: string
+  id: number
+  nickname: string
+  role: Role
+  phone: string
+  status: number
+  isSuper?: boolean
 }
 
-/** 管理员登录（独立通道，与管理门户的 login 完全分离）。 */
-export async function adminLogin(account: string, password: string): Promise<LoginResult> {
-  // TODO(real): return http.post('/auth/admin/login', { account, password })
-  return mockAdminLogin(account, password)
+/** 入驻注册入参（后端契约字段） */
+export interface RegisterPayloadDTO {
+  role: 'student' | 'teacher'
+  phone: string
+  password: string
+  captchaToken: string
+  nickname: string
+  age?: number
+  gender?: string
+  grade: number
+  subject: number
+  description?: string
+  address?: string
+  timeTable1: number
+  timeTable2: number
+  timeTable3: number
+  timeTable4: number
+  timeTable5: number
+  timeTable6: number
+  timeTable7: number
+  qrcode?: string
+  idcard?: string
+  certificate?: string
 }
 
-/** 注册入驻（学生/教师），提交后进入管理员审核队列。 */
-export async function registerUser(p: RegisterPayload): Promise<{ submitted: boolean }> {
-  // TODO(real): return http.post('/auth/register', p)
-  mockRegister(p as RegisterPayload & { role: 'student' | 'teacher' })
-  return { submitted: true }
+/** 学生/教师登录（role 必填） */
+export async function login(role: Role, phone: string, password: string): Promise<LoginResultDTO> {
+  return http.post<LoginResultDTO>('/api/auth/login', { role, phone, password })
 }
 
-/** 退出登录（清前端态即可）。 */
-export async function logout(): Promise<void> {
-  // TODO(real): return http.post('/auth/logout')
-  localStorage.removeItem('dl_tutor_token')
-  localStorage.removeItem('dl_tutor_current')
+/** 管理员登录（独立通道） */
+export async function adminLogin(account: string, password: string): Promise<LoginResultDTO> {
+  return http.post<LoginResultDTO>('/api/auth/login', { role: 'admin', phone: account, password })
+}
+
+/** 入驻注册（需 captchaToken） */
+export async function register(payload: RegisterPayloadDTO): Promise<{ id: number }> {
+  return http.post<{ id: number }>('/api/auth/register', payload)
 }
