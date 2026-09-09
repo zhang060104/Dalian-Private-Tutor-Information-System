@@ -92,3 +92,55 @@
 - **前端**：学生/老师面板「我的资料」+ 修改弹窗 + 待审撤销；管理后台「资料审核」Tab + 字段级新旧对比（通过/驳回）
 - 验证：`mvn compile` BUILD SUCCESS（34 源文件）；`npm run type-check` 通过
 - 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 14:00 ｜ 分支清理（Claw 助手）
+
+- **分支盘点**：
+  - `feature/backend-service`（PR #9，open）：领先 main 7 commits / 落后 0，**可干净合并**，保留
+  - `feature/remove-student-teacher-list`（PR #8，merged）：全部提交已在 main 内，**远程分支删除**
+  - 没有冲突无法合并的分支
+- **删除命令**：`git push origin :refs/heads/feature/remove-student-teacher-list`（exit 0）
+- **prune 后**：`git fetch --prune` + packed-refs 自动同步，本地 tracking 引用已清理
+- **最终远程分支**：仅 `main` 与 `feature/backend-service`（PR #9 待 merge）
+- 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 前端 8 项优化：数据源真实化 + 双选大厅 + 信用分（Claw 助手）
+
+- **1 · 年级语义修正（按数据库文档）**：`GRADE_LEVELS` 增加 `{value:17,label:'已毕业'}`；
+  老师入驻/修改资料明确标注「可授年级（能教哪个学段就选哪个，含已毕业/在职）」，不再是混淆的自身年级。
+  同步在数据库设计文档补记 `17=已毕业`、`credit 默认 100`。
+- **2 · 移除 mock 数据与提示**：删除 `data/tutors.ts` 的 `TUTORS`/`GRADE_OPTIONS`、`Tutor` 类型、
+  `TutorCard.vue`、公开 mock 版 `TutorsView.vue`；删除 LoginView「演示账号/一键填入」、
+  各工作台「演示模式」提示条；`/tutors` 路由移除（教员浏览并入登录后的双选大厅）。
+- **3 · 工作台不带对方列表 + 投递**：老师/学生个人面板（/teacher/home、/student/home）只保留
+  「我的资料 + 修改（管理员审核）」与信用分，删净老师/学生列表与「选择 TA」。
+- **4 · 全站禁选中**：`styles/index.css` 全局 `user-select:none`（input/textarea/contenteditable 例外）。
+- **5 · 主页精简**：HomeView 删除 FAQ、明星教员、营销数据面板，只留「hero + 四步使用引导 + CTA」。
+- **6 · 双选大厅含老师/学生两个池**：新增登录后页面 `/match`（MatchView.vue），el-tabs 分「老师/学生」，
+  对「另一侧」才显示「投递简历」（可撤回）；卡片含信用分。
+- **7 · 单一个人资料页**：新增 `/person/:role/:id`（PersonProfileView.vue），纯净展示一位老师/学生的
+  完整资料 + 空余时间，无任何列表；可从此投递。
+- **8 · 信用分展示（替代星级）**：`TeacherAccount`/`StudentAccount` 增加 `credit`，store 映射自后端
+  `dto.credit`；工作台/双选卡/个人资料页均以数字展示「信用分」（后端默认 100），彻底移除 mock 星级评分。
+- 路由守卫支持 `roles: ['teacher','student']` 数组（登录后按角色，未登录去 /login 带回 redirect）。
+- 验证：`npm run type-check` 通过；dev server（5180）各新页面模块均 200。
+- 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 删除「关于中心」页（/about，纯前端）
+- 删除 `front_end/src/views/AboutView.vue` 与路由 `/about`。
+- `PortalLayout` 顶部导航精简：未登录仅「首页」，登录师生另加「双选大厅」（原 about 入口删除）。
+- `HomeView` CTA「了解平台」按钮（跳 /about）删除。
+- 全仓无 AboutView/「关于中心」残留；`npm run type-check` 通过。
+- 提交人：Claw 助手 / zhang060104 授权
+
+## 2026-09-08 ｜ 前端整体废弃重建 + 删除项目内数据库脚本（承接上一条：about 随重建一并废弃）
+**背景**：旧 front_end 多轮迭代后问题过多（工程骨架文件曾丢失、代码与新架构冲突），决定废弃重建。
+- 删除旧 `front_end` 全部文件：业务源码（门户 / 双选大厅 / member / auth / admin / store / api 等 ~4486 行）、
+  public 静态资源、Element Plus 依赖与样式体系；about 页随旧代码一并移除（覆盖上一条「删 about」）。
+- 重建标准空骨架：Vue 3.5 + Vite 8 + TypeScript 6 + Vue Router + Pinia，仅含 `/` 占位页，无任何业务逻辑。
+  注：`create-vue` 交互式脚手架因环境批量删除保护拦截未能完整落地，改为逐文件落盘（产物等同官方空模板）。
+  验证：`npm run type-check` 通过、`vite build` 成功、`npm run dev` HTTP 200。
+- 删除 `back_end/sql/` 的 `schema.sql` / `seed.sql`：数据库构建脚本不再直接存于项目目录（避免后续维护推送成本），
+  schema 重构待「数据库设计说明文档.md」更新后落地。
+- 后续：数据库文档 → 数据库重构 + 后端逻辑重构 → 前端按新契约重开发。
+- 提交人：Claw 助手 / zhang060104 授权
