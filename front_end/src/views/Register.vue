@@ -61,11 +61,12 @@ const rules = reactive<FormRules>({
 })
 
 /** 真实上传：multipart 到 /api/upload，返回服务端 url。
- *  注册页为匿名上传：必须带 X-Captcha-Token（滑块验证签发）。
+ *  注册页为匿名上传：必须带 X-Captcha-Token（滑块验证签发）+ role（落盘到对应角色目录）。
  *  Content-Type 交由 axios/浏览器自动生成（含 boundary），切勿手写。 */
 async function uploadImage(file: File): Promise<string> {
   const fd = new FormData()
   fd.append('file', file)
+  fd.append('role', role.value)
   const headers = captchaToken.value ? { 'X-Captcha-Token': captchaToken.value } : undefined
   const res = await http.post<{ url: string }>('/api/upload', fd, { headers })
   return res.url
@@ -154,7 +155,7 @@ async function submit() {
   }
   try {
     await register(payload)
-    ElMessage.success('入驻申请已提交，请等待管理员审核通过后登录')
+    ElMessage.success('注册申请已提交，请等待平台管理员审核通过后登录')
     router.push('/login')
   } catch (e) {
     // http 已弹错
@@ -172,7 +173,7 @@ function onSubjectChange(v: number[]) {
     <el-card class="card" shadow="never">
       <h2 class="title">入驻大连家教中心</h2>
       <el-alert type="info" :closable="false" show-icon class="tip">
-        注册信息需提交平台<b>管理员审核</b>，审核通过后方可登录。请如实填写真实资料。
+        提交后账号需平台管理员审核通过方可登录使用。请如实填写真实资料（证件仅用于平台备案核验）。
       </el-alert>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" size="large">
@@ -304,7 +305,7 @@ function onSubjectChange(v: number[]) {
         </el-form-item>
 
         <el-button type="primary" size="large" class="submit" @click="submit">
-          提交入驻申请
+          完成注册
         </el-button>
       </el-form>
     </el-card>

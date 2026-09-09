@@ -60,6 +60,9 @@ public class AuthController {
                 if (t == null || !PasswordUtil.matches(password, t.getPassword())) {
                     throw new BizException("手机号或密码错误");
                 }
+                if (t.getStatus() != null && t.getStatus() == -1) {
+                    throw new BizException("账号正在等待管理员审核，暂不可登录");
+                }
                 r.put("token", TokenUtil.issue(t.getId(), "teacher", ttlHours, secret));
                 r.put("id", t.getId());
                 r.put("nickname", t.getNickname());
@@ -71,6 +74,9 @@ public class AuthController {
                 Student s = studentMapper.findByPhone(phone);
                 if (s == null || !PasswordUtil.matches(password, s.getPassword())) {
                     throw new BizException("手机号或密码错误");
+                }
+                if (s.getStatus() != null && s.getStatus() == -1) {
+                    throw new BizException("账号正在等待管理员审核，暂不可登录");
                 }
                 r.put("token", TokenUtil.issue(s.getId(), "student", ttlHours, secret));
                 r.put("id", s.getId());
@@ -112,7 +118,7 @@ public class AuthController {
             throw new BizException("该手机号已注册，请直接登录");
         }
 
-        // 创建账号：status=1（未激活，审核通过后置 0）
+        // 创建账号：status=-1（待审核：不可登录、不可接单、不上池）；管理员 approve 后置 0
         String passwordHash = PasswordUtil.encode(p.getPassword());
         Integer accountId;
         if (type == ProfileReviewService.TYPE_TEACHER) {
@@ -127,7 +133,7 @@ public class AuthController {
             t.setSubject(p.getSubject());
             t.setDescription(p.getDescription());
             t.setAddress(p.getAddress());
-            t.setStatus(1);
+            t.setStatus(-1);
             t.setTimeTable1(p.getTimeTable1());
             t.setTimeTable2(p.getTimeTable2());
             t.setTimeTable3(p.getTimeTable3());
@@ -152,7 +158,7 @@ public class AuthController {
             s.setSubject(p.getSubject());
             s.setDescription(p.getDescription());
             s.setAddress(p.getAddress());
-            s.setStatus(1);
+            s.setStatus(-1);
             s.setTimeTable1(p.getTimeTable1());
             s.setTimeTable2(p.getTimeTable2());
             s.setTimeTable3(p.getTimeTable3());
@@ -166,7 +172,7 @@ public class AuthController {
             accountId = s.getId();
         }
 
-        // 提交入驻资料审核请求（json 不含密码，仅资料）
+        // 提交入驻审核请求（json 不含密码，仅资料）；管理员 approve 后 status -1 -> 0
         Map<String, Object> profile = new java.util.LinkedHashMap<>();
         profile.put("nickname", p.getNickname());
         profile.put("phone", p.getPhone());
@@ -190,8 +196,8 @@ public class AuthController {
 
         Map<String, Object> r = new java.util.LinkedHashMap<>();
         r.put("accountId", accountId);
-        r.put("status", 1);
-        r.put("message", "注册申请已提交，请等待管理员审核通过后开始使用");
+        r.put("status", -1);
+        r.put("message", "注册申请已提交，请等待平台管理员审核通过后使用");
         return ApiResponse.ok(r);
     }
 

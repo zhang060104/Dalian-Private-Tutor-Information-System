@@ -33,6 +33,12 @@ const order = ref<Order | null>(null)
 const loading = ref(true)
 const acting = ref(false)
 
+/** 平台官方收款码（缴费扫码用）：/imgs 下静态图（vite public） */
+const PAY_QRS = [
+  { label: '微信支付', src: '/imgs/pay-wechat.jpg' },
+  { label: '支付宝', src: '/imgs/pay-alipay.jpg' },
+]
+
 const actions = computed(() => (order.value ? myActions(order.value, role) : null))
 
 function meta() {
@@ -235,6 +241,30 @@ onMounted(async () => {
       <!-- 缴费核验状态 -->
       <el-card v-if="actions.needDeposit || (order.status >= 5 && order.status <= 6)" shadow="never" class="mb-16">
         <template #header>费用缴纳与核验</template>
+
+        <!-- 官方收款码：有待缴项目时展示，扫码支付后再上传凭证 -->
+        <div
+          v-if="depositKinds().some((k) => !k.done)"
+          style="border: 1px dashed #cfe0fb; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; background: #f8fbff"
+        >
+          <div style="font-size: 14px; margin-bottom: 10px">
+            <b style="color: #2f7cf6">请扫码支付：</b>
+            <span style="color: #606266; font-size: 13px">微信 / 支付宝扫描平台官方收款码，支付成功后点击下方对应项目"上传付款截图"提交核验。</span>
+          </div>
+          <div style="display: flex; gap: 20px; flex-wrap: wrap">
+            <div v-for="q in PAY_QRS" :key="q.src" style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+              <el-image
+                :src="q.src"
+                :preview-src-list="[q.src]"
+                preview-teleported
+                fit="contain"
+                style="width: 128px; height: 128px; border: 1px solid #eef1f6; border-radius: 8px"
+              />
+              <span style="font-size: 12px; color: #909399">{{ q.label }}</span>
+            </div>
+          </div>
+        </div>
+
         <div class="pays">
           <div v-for="k in depositKinds()" :key="k.kind" class="pay-item" :class="{ done: k.done }">
             <div class="pay-l">

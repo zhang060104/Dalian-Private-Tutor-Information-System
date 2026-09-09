@@ -74,7 +74,7 @@ public class ProfileReviewService {
         return requestLogMapper.findPending(type, userId) != null;
     }
 
-    /** 提交入驻申请（账号已由注册接口创建，status=1） */
+    /** 提交入驻申请（账号已由注册接口创建，status=-1 待审核） */
     public ProfileReviewVO submitRegister(int type, int accountId, String name, Map<String, Object> profile) {
         if (hasPending(type, accountId)) {
             throw new BizException("已有待审核的入驻申请，请等待管理员处理");
@@ -96,8 +96,8 @@ public class ProfileReviewService {
             throw new BizException("已有待审核的申请，请等待管理员处理或先撤回");
         }
         // name/fields 仅作管理员展示辅助，允许缺省（name 缺省用当前昵称兜底）
-        // 入驻被驳回（status=1）的账号再次提交 = 重新激活入驻申请；正常账号提交 = 资料修改
-        boolean reactivate = accountStatus(type, userId) == 1;
+        // 账号未激活（status=-1：入驻被驳回后保留）再次提交 = 重新激活入驻申请；正常账号提交 = 资料修改
+        boolean reactivate = accountStatus(type, userId) == -1;
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("kind", reactivate ? "register" : "update");
@@ -111,10 +111,10 @@ public class ProfileReviewService {
     private int accountStatus(int type, int userId) {
         if (type == TYPE_TEACHER) {
             Teacher t = teacherMapper.findById(userId);
-            return t == null || t.getStatus() == null ? 1 : t.getStatus();
+            return t == null || t.getStatus() == null ? -1 : t.getStatus();
         }
         Student s = studentMapper.findById(userId);
-        return s == null || s.getStatus() == null ? 1 : s.getStatus();
+        return s == null || s.getStatus() == null ? -1 : s.getStatus();
     }
 
     private ProfileReviewVO insertLog(int type, int tarId, Map<String, Object> payload) {
@@ -169,8 +169,8 @@ public class ProfileReviewService {
     }
 
     /**
-     * 管理员驳回：数据不动，账号保留（status 保持 1 未激活）。
-     * 用户可登录后修改资料重新提交入驻申请（re-register 或 kind=update），管理员可手动修正后通过。
+     * 管理员驳回：数据不动，账号保留（status 保持 -1 未激活，登录被拦）。
+     * 用户可联系管理员修正后重新审核；如放开"被驳回可登录重提"，将 status 置 0/1 并在登录放行即可。
      */
     public void reject(RequestLog log) {
         // 无数据变更，仅 json 标记 decision

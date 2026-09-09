@@ -17,6 +17,21 @@
   font-weight: normal;
 }
 
+/* 全站禁止鼠标框选文本（防止误选/复制页面内容）；输入框内仍允许选中编辑 */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+input,
+textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
 html,
 body,
 #app {
