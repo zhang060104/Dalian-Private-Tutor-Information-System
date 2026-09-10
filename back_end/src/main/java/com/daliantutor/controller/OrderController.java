@@ -78,8 +78,14 @@ public class OrderController {
         Student student = studentMapper.findById(studentId);
         Teacher teacher = teacherMapper.findById(teacherId);
         if (student == null || teacher == null) throw new BizException("对方账号不存在");
-        if (student.getStatus() != 0) throw new BizException("对方当前未在寻找老师");
-        if (teacher.getStatus() != 0) throw new BizException("对方当前未在寻找学生");
+        // 发起者自己若已暂停寻找，不允许发起新订单（需先在个人主页恢复）
+        if ("teacher".equals(role)) {
+            if (teacher.getStatus() != 0) throw new BizException("您当前已暂停寻找学生，请先恢复后再投递");
+            if (student.getStatus() != 0) throw new BizException("对方当前没有在寻找老师");
+        } else {
+            if (student.getStatus() != 0) throw new BizException("您当前已暂停寻找老师，请先恢复后再发起");
+            if (teacher.getStatus() != 0) throw new BizException("对方当前没有在寻找学生");
+        }
         if (orderMapper.findActive(studentId, teacherId) != null) {
             throw new BizException("你们已有进行中的订单，请勿重复发起");
         }

@@ -37,7 +37,7 @@ async function logout() {
     <header class="topbar">
       <div class="inner">
         <router-link to="/" class="brand">
-          <span class="logo">教</span>
+          <img src="/imgs/logo.jpg" alt="logo" class="logo" />
           <span class="brand-text">大连家教中心</span>
         </router-link>
         <nav class="nav">
@@ -100,12 +100,8 @@ async function logout() {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: #2f7cf6;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
+  object-fit: cover;
+  display: inline-block;
 }
 .nav {
   display: flex;

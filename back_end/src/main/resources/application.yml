@@ -27,7 +27,7 @@ daliantutor:
   token-secret: ${TUTOR_TOKEN_SECRET:dalian-tutor-dev-secret-2026}
   token-ttl-hours: 168
   # 图片上传根目录（收款码/身份证/证书/支付截图/仲裁证据），经 /files/** 对外访问
-  upload-dir: ${TUTOR_UPLOAD_DIR:./uploads}
+  upload-dir: ${TUTOR_UPLOAD_DIR:E:/serverData/Dalian-Private-Tutor-Information-System}
   # 滑块验证码联调开关：true 时跳过 consume 校验（便于纯接口联调，生产务必保持 false）
   captcha-disabled: ${TUTOR_CAPTCHA_DISABLED:false}
 
