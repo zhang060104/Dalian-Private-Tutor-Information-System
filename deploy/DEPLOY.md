@@ -87,29 +87,52 @@ Start-Process .\nginx.exe -WorkingDirectory .\   # 启动
 
 ---
 
-## 4. 对外暴露：Cloudflare Tunnel + 子域名
+## 4. 对外暴露：Cloudflare Tunnel + 子域名（✅ 已上线 2026-09-11）
 
-现有 tunnel（造物集官网用）配置文件位于 `C:\Users\Administrator\.cloudflared\config.yml`。
-给家教系统加一个子域名（例如 `tutor.<你的域名>`）只需两步：
+**当前线上地址：<https://tutor.collectionofcreations.uk>**
 
-**① 在 config.yml 的 `ingress` 列表顶部加入（顺序有意义，具体路径规则要放在通配之前）：**
+复用造物集官网所在的本机 tunnel（无需公网 IP、无需端口映射、无需自签证书）：
 
-```yaml
-  - hostname: tutor.<你的域名>
-    service: http://localhost:80        # 指向 nginx
-```
+| 域名 | 目标 |
+| --- | --- |
+| `tutor.collectionofcreations.uk` | `http://localhost:80`（nginx：静态 dist + /api、/files 反代 8083） |
+| `collectionofcreations.uk` `/api/*` | `http://localhost:8080`（造物集后端） |
+| `collectionofcreations.uk` 其余 | `http://localhost:8081`（造物集前端） |
 
-**② 在 Cloudflare 里为该子域名建立指向 tunnel 的 DNS 记录（CNAME）：**
+配置文件：`C:\Users\Administrator\.cloudflared\config.yml`（tunnel id `41839652-7eb3-4013-87b2-709fb8d735fd`）
+
+### 变更子域名 / 新增子域名的标准三步
 
 ```powershell
-cloudflared tunnel route dns <tunnel-id> tutor.<你的域名>
+# 1) 编辑 config.yml 的 ingress（具体 path 规则要放在通配之前），校验语法
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel ingress validate
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel ingress rule https://tutor.collectionofcreations.uk/api/captcha
+
+# 2) 建立指向 tunnel 的 DNS 记录（CNAME，自动代理）
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel route dns 41839652-7eb3-4013-87b2-709fb8d735fd tutor.collectionofcreations.uk
+
+# 3) 重启 tunnel 生效（改 ingress 必须重启，无热加载）
+Get-Process cloudflared | Stop-Process -Force
+Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+  CommandLine = 'cmd.exe /c "C:\Users\Administrator\.cloudflared\run-tunnel.cmd"'
+  CurrentDirectory = 'C:\Users\Administrator\.cloudflared'
+}
 ```
 
-**③ 重启 cloudflared 使配置生效**（当前是前台进程方式运行，非系统服务）。
+> `run-tunnel.cmd` 是 2026-09-11 新增的启动包装脚本（日志写到 `%TEMP%\cloudflared_tutor.log`）。
+> 用 `Invoke-CimMethod Win32_Process Create` 启动可让进程**脱离调用它的终端会话**（父进程为 WMI host），终端关闭不会带走 tunnel。
+> ⚠️ 重启 tunnel 会造成**所有**域名短暂中断（数秒），建议避开访问高峰。
 
-效果：`https://tutor.<你的域名>` 直接可用，TLS 由 Cloudflare 自动签发。
+### ☠️ 安全提醒（上线后必须处理）
 
-> 注意：`cloudflared tunnel route dns` 需要 `~/.cloudflared/cert.pem`（该文件已存在），且域名必须与 tunnel 同属一个 Cloudflare 账号。
+- 站点已公网可达，而管理员种子账号仍是**默认密码** → 必须立刻改掉（后台创建的管理员同样要设强密码）。
+- 建议对 `/admin` 路径加 Cloudflare Access（Zero Trust，免费额度 50 用户）做二次防护，避免后台直接暴露在公网。
+- 后端 `TUTOR_CAPTCHA_DISABLED` 生产环境必须保持 `false`（默认），否则滑块验证形同虚设。
+
+### nginx 侧无需改动
+
+`server_name _` 为默认服务器，接受任意 Host；前端构建产物全部使用相对路径（已核对 dist 无 `localhost` 硬编码），因此换域名/加子域名后无需重新构建。
+
 
 ---
 
