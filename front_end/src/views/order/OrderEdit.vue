@@ -146,4 +146,15 @@ async function confirmAsReviewer() {
   display: flex;
   gap: 12px;
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 768px) {
+  .acts {
+    flex-direction: column;
+  }
+  .acts .el-button {
+    width: 100%;
+    margin-left: 0;
+  }
+}
 </style>

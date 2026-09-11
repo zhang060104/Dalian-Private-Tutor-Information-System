@@ -3,6 +3,9 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { listAdmins, createAdmin, deleteAdmin, type AdminDTO } from '@/api/admin'
+import { useResponsive } from '@/composables/useResponsive'
+
+const { dlgWidth } = useResponsive()
 
 const auth = useAuthStore()
 const admins = ref<AdminDTO[]>([])
@@ -74,7 +77,7 @@ async function del(a: AdminDTO) {
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dlg" title="新建管理员" width="420px">
+    <el-dialog v-model="dlg" title="新建管理员" :width="dlgWidth('420px')">
       <el-form label-position="top">
         <el-form-item label="昵称"><el-input v-model="form.nickname" /></el-form-item>
         <el-form-item label="账号（手机号）"><el-input v-model="form.phone" /></el-form-item>

@@ -207,8 +207,62 @@ function go() {
   margin-bottom: 18px;
 }
 @media (max-width: 820px) {
+  .hero {
+    padding: 48px 0 44px;
+  }
+  .hero h1 {
+    font-size: 28px;
+  }
+  .sub {
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
+  .cards,
   .role-cards {
     grid-template-columns: 1fr;
+  }
+  .card {
+    padding: 20px 18px;
+  }
+  .steps,
+  .roles {
+    padding: 40px 0;
+  }
+  .steps h2,
+  .roles h2 {
+    font-size: 20px;
+  }
+  .steps h2 {
+    margin-bottom: 24px;
+  }
+  .roles-sub {
+    margin-bottom: 22px;
+  }
+  .cta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cta .el-button {
+    width: 100%;
+    margin-left: 0;
+  }
+  .role-card {
+    flex-direction: column;
+  }
+  .role-card img {
+    width: 100%;
+    height: auto;
+    max-height: 320px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 23px;
+    line-height: 1.4;
+  }
+  .container {
+    padding: 0 14px;
   }
 }
 </style>

@@ -200,4 +200,36 @@ onMounted(() => {
   font-size: 12px;
   margin-top: 2px;
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 768px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .kw,
+  .grade {
+    width: 100%;
+  }
+  .toolbar .el-button {
+    width: 100%;
+  }
+  .row {
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+  .line1 {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  .row > .el-button {
+    flex: none;
+    padding: 4px 2px;
+  }
+}
 </style>

@@ -44,6 +44,7 @@ async function submit() {
 <style scoped>
 .wrap {
   min-height: 100vh;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -51,7 +52,8 @@ async function submit() {
   padding: 20px;
 }
 .card {
-  width: 380px;
+  width: 100%;
+  max-width: 380px;
   border-radius: 14px;
 }
 .brand {

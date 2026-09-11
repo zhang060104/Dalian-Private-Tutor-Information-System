@@ -10,6 +10,9 @@ import { gradeLabel } from '@/utils/grade'
 import { decodeSubjects, SUBJECTS } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
+import { useResponsive } from '@/composables/useResponsive'
+
+const { dlgWidth } = useResponsive()
 
 const route = useRoute()
 const router = useRouter()
@@ -134,7 +137,7 @@ function back() {
     </template>
 
     <!-- 发起匹配弹窗 -->
-    <el-dialog v-model="dlg" :title="canResume ? '投递简历' : '免费试课'" width="640px" destroy-on-close>
+    <el-dialog v-model="dlg" :title="canResume ? '投递简历' : '免费试课'" :width="dlgWidth('640px')" destroy-on-close>
       <el-form label-position="top">
         <el-form-item :label="'匹配科目（可多选，' + profile?.nickname + ' 所需/可授）'">
           <el-select v-model="form.subjects" multiple placeholder="选择一个或多个科目" style="width: 100%">

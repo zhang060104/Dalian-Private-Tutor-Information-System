@@ -21,6 +21,9 @@ import { decodeSubjects } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
 import { orderStatus, myActions, DEPOSIT_AMOUNT } from '@/utils/order'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
+import { useResponsive } from '@/composables/useResponsive'
+
+const { descCols, dlgWidth } = useResponsive()
 
 const route = useRoute()
 const router = useRouter()
@@ -232,7 +235,7 @@ onMounted(async () => {
         </div>
         <div class="st-desc muted">{{ meta()?.desc }}</div>
 
-        <el-descriptions :column="2" border class="mt-16">
+        <el-descriptions :column="descCols" border class="mt-16">
           <el-descriptions-item label="对方">
             {{ order.peer?.nickname }}（{{ order.peer?.role === 'teacher' ? '老师' : '学生' }}）
           </el-descriptions-item>
@@ -335,7 +338,7 @@ onMounted(async () => {
     </template>
 
     <!-- 缴费弹窗 -->
-    <el-dialog v-model="payDlg" title="上传缴费凭证" width="460px" destroy-on-close>
+    <el-dialog v-model="payDlg" title="上传缴费凭证" :width="dlgWidth('460px')" destroy-on-close>
       <el-alert type="warning" :closable="false" show-icon class="mb-16">请上传真实支付成功的交易记录截图，用于管理员核验。</el-alert>
       <el-upload action="#" :auto-upload="false" :limit="1" list-type="picture-card" accept="image/*" :on-change="(f: UploadUserFile) => (payFile = f)">
         <el-icon><Plus /></el-icon>
@@ -348,7 +351,7 @@ onMounted(async () => {
     </el-dialog>
 
     <!-- 仲裁弹窗 -->
-    <el-dialog v-model="arbDlg" title="申请毁约仲裁" width="520px" destroy-on-close>
+    <el-dialog v-model="arbDlg" title="申请毁约仲裁" :width="dlgWidth('520px')" destroy-on-close>
       <el-form label-position="top">
         <el-form-item label="违约情况描述"><el-input v-model="arbText" type="textarea" :rows="4" placeholder="请如实描述对方违约情况" /></el-form-item>
         <el-form-item label="证据图片（选填）">
@@ -365,4 +368,91 @@ onMounted(async () => {
     </el-dialog>
   </div>
 </template>
+
+<style scoped>
+.ph {
+  margin-bottom: 18px;
+}
+.top-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.st-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1d2740;
+}
+.st-desc {
+  font-size: 13px;
+  margin-top: 6px;
+}
+.tp {
+  white-space: pre-line;
+  line-height: 1.8;
+}
+.c-ph {
+  font-size: 15px;
+  margin-right: 8px;
+}
+.pays {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pay-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #eef1f6;
+  border-radius: 10px;
+  background: #fff;
+}
+.pay-item.done {
+  background: #f7fbf9;
+  border-color: #d8efe3;
+}
+.pay-l {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.pay-l b {
+  font-size: 14px;
+  color: #1d2740;
+}
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.acts .el-button + .el-button {
+  margin-left: 0;
+}
+.trial-tip {
+  margin-top: 12px;
+}
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 768px) {
+  .st-name {
+    font-size: 16px;
+  }
+  .pay-item {
+    align-items: flex-start;
+  }
+  .pay-item .el-button {
+    width: 100%;
+  }
+  .acts .el-button {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+}
+</style>
 

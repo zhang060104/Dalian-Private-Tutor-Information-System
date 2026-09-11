@@ -58,6 +58,7 @@ const summary = computed(() => {
       <span><i class="dot"></i>未选</span>
       <el-text size="small" type="info">点击方格切换该小时空闲</el-text>
     </div>
+    <div class="swipe-hint">← 左右滑动可查看完整 24 小时时间表 →</div>
     <div class="summary muted">{{ summary }}</div>
   </div>
 </template>
@@ -137,5 +138,32 @@ const summary = computed(() => {
   max-height: 60px;
   overflow: auto;
   white-space: pre-wrap;
+}
+
+/* 手机端才显示的滑动提示 */
+.swipe-hint {
+  display: none;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #a0a8b8;
+}
+
+@media (max-width: 768px) {
+  .swipe-hint {
+    display: block;
+  }
+  .cell {
+    width: 16px;
+    height: 16px;
+  }
+  .hour-scale span {
+    width: 16px;
+  }
+  .grid {
+    min-width: 500px;
+  }
+  .summary {
+    max-height: 88px;
+  }
 }
 </style>

@@ -4,6 +4,9 @@ import { ElMessage } from 'element-plus'
 import { listRequests, resolveRequest, type RequestDTO } from '@/api/admin'
 import { gradeLabel } from '@/utils/grade'
 import { decodeSubjects, SUBJECTS } from '@/utils/subject'
+import { useResponsive } from '@/composables/useResponsive'
+
+const { descCols, dlgWidth } = useResponsive()
 
 const items = ref<RequestDTO[]>([])
 const loading = ref(true)
@@ -148,7 +151,7 @@ function timeOf(r: RequestDTO): string {
         <span class="muted">{{ timeOf(r) }}</span>
       </div>
 
-      <el-descriptions :column="2" size="small" border>
+      <el-descriptions :column="descCols" size="small" border>
         <el-descriptions-item v-for="l in fields(r)" :key="l.k" :label="l.k">{{ l.v }}</el-descriptions-item>
       </el-descriptions>
 
@@ -189,7 +192,7 @@ function timeOf(r: RequestDTO): string {
       </div>
     </el-card>
 
-    <el-dialog v-model="manualOpen" title="手动修改用户信息后通过（仅合并以下字段）" width="560px">
+    <el-dialog v-model="manualOpen" title="手动修改用户信息后通过（仅合并以下字段）" :width="dlgWidth('560px')">
       <el-form label-position="top">
         <el-form-item label="昵称"><el-input v-model="manual.nickname" /></el-form-item>
         <el-form-item label="年龄">

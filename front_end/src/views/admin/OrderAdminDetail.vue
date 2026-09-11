@@ -6,6 +6,9 @@ import http from '@/api/http'
 import { getOrderAdmin, uploadInfoFeeQr, type AdminOrderDetailView } from '@/api/admin'
 import { timetableSummary } from '@/utils/timetable'
 import { DEPOSIT_AMOUNT } from '@/utils/order'
+import { useResponsive } from '@/composables/useResponsive'
+
+const { descCols } = useResponsive()
 
 const route = useRoute()
 const router = useRouter()
@@ -79,7 +82,7 @@ onMounted(async () => {
           <el-tag type="primary" effect="light">{{ data.statusName }}</el-tag>
           <span class="muted">{{ data.statusDesc }}</span>
         </div>
-        <el-descriptions :column="2" border class="mt-16">
+        <el-descriptions :column="descCols" border class="mt-16">
           <el-descriptions-item label="学生">
             {{ data.studentName }}
             <span v-if="data.studentPhone" class="muted">（{{ data.studentPhone }}）</span>

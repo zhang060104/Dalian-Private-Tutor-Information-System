@@ -13,6 +13,9 @@ import {
 import { gradeLabel } from '@/utils/grade'
 import { decodeSubjects } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
+import { useResponsive } from '@/composables/useResponsive'
+
+const { descCols } = useResponsive()
 
 const route = useRoute()
 const router = useRouter()
@@ -145,7 +148,7 @@ onMounted(async () => {
     <el-card v-if="profile" shadow="never">
       <el-tabs v-model="activeTab">
         <el-tab-pane label="个人资料" name="profile">
-          <el-descriptions :column="2" border>
+          <el-descriptions :column="descCols" border>
             <el-descriptions-item :label="role === 'teacher' ? '本人年级' : '年级'">
               {{ gradeLabel(profile.grade) }}
             </el-descriptions-item>
@@ -159,7 +162,7 @@ onMounted(async () => {
           </el-descriptions>
 
           <div class="sec-title">账号信息</div>
-          <el-descriptions :column="2" border>
+          <el-descriptions :column="descCols" border>
             <el-descriptions-item label="用户 ID">{{ id }}</el-descriptions-item>
             <el-descriptions-item label="登录手机号">{{ profile.phone || '—' }}</el-descriptions-item>
             <el-descriptions-item label="账号状态">

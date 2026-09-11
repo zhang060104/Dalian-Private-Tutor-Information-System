@@ -132,4 +132,36 @@ function statusTag(o: Order) {
   font-size: 12px;
   margin-top: 4px;
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 768px) {
+  .order {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px;
+  }
+  .left {
+    flex: 1 1 100%;
+  }
+  .peer {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .desc {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+  }
+  .st {
+    margin-top: 0;
+  }
+}
 </style>

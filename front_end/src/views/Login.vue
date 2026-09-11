@@ -71,7 +71,8 @@ async function submit() {
   padding: 30px 16px;
 }
 .card {
-  width: 400px;
+  width: 100%;
+  max-width: 400px;
   border-radius: 14px;
 }
 .title {

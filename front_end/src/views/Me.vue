@@ -12,6 +12,9 @@ import { timetableSummary } from '@/utils/timetable'
 import { orderStatus } from '@/utils/order'
 import ScheduleEditor from '@/components/ScheduleEditor.vue'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
+import { useResponsive } from '@/composables/useResponsive'
+
+const { descCols, dlgWidth } = useResponsive()
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -128,7 +131,7 @@ onMounted(load)
             </div>
           </div>
         </div>
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="descCols" border>
           <el-descriptions-item :label="meRole === 'teacher' ? '本人年级' : '年级'">{{ gradeLabel(me.grade) }}</el-descriptions-item>
           <el-descriptions-item label="性别">{{ me.gender ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="年龄">{{ me.age ?? '—' }}</el-descriptions-item>
@@ -157,7 +160,7 @@ onMounted(load)
     </template>
 
     <!-- 修改资料弹窗（提交管理员审核） -->
-    <el-dialog v-model="editOpen" title="修改我的资料" width="680px" destroy-on-close>
+    <el-dialog v-model="editOpen" title="修改我的资料" :width="dlgWidth('680px')" destroy-on-close>
       <el-alert type="warning" :closable="false" show-icon class="mb-16">修改需提交管理员审核，审核通过后新资料生效</el-alert>
       <el-form ref="editFormRef" :model="edit" label-position="top">
         <el-row :gutter="16">
@@ -241,5 +244,30 @@ onMounted(load)
 }
 .order-main b {
   font-size: 15px;
+}
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 768px) {
+  .head {
+    gap: 12px;
+  }
+  .avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+  .name-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    margin-top: 0;
+  }
+  .name-row b {
+    font-size: 17px;
+  }
+  .order {
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+  }
 }
 </style>

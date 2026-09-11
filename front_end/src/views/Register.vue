@@ -320,7 +320,8 @@ function onSubjectChange(v: number[]) {
   padding: 30px 16px;
 }
 .card {
-  width: 720px;
+  width: 100%;
+  max-width: 720px;
   border-radius: 14px;
 }
 .title {
@@ -338,5 +339,18 @@ function onSubjectChange(v: number[]) {
 }
 .submit {
   width: 100%;
+}
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 768px) {
+  .reg-wrap {
+    padding: 16px 10px 40px;
+  }
+  .title {
+    font-size: 18px;
+  }
+  .tip {
+    margin-bottom: 14px;
+  }
 }
 </style>

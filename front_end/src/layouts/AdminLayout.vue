@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Menu } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+/** 手机端侧边栏抽屉开关 */
+const menuOpen = ref(false)
 
 const isLoginPage = computed(() => route.name === 'admin-login')
 const isAdmin = computed(() => auth.role === 'admin')
@@ -43,7 +47,10 @@ async function logout() {
     </aside>
     <div class="main">
       <header class="top">
-        <span class="muted">管理后台 · 不对公众开放入口</span>
+        <button class="burger" type="button" aria-label="打开菜单" @click="menuOpen = true">
+          <el-icon><Menu /></el-icon>
+        </button>
+        <span class="muted top-tip">管理后台 · 不对公众开放入口</span>
         <div class="top-right">
           <span v-if="isAdmin" class="who">{{ auth.nickname }}</span>
           <el-button size="small" text @click="logout">退出登录</el-button>
@@ -53,6 +60,29 @@ async function logout() {
         <router-view />
       </div>
     </div>
+
+    <!-- 手机端侧边栏抽屉 -->
+    <el-drawer v-model="menuOpen" direction="ltr" size="72%" :with-header="false">
+      <div class="drawer">
+        <div class="drawer-brand">家教中心后台</div>
+        <nav class="drawer-menu">
+          <router-link
+            v-for="m in menus"
+            :key="m.path"
+            :to="m.path"
+            class="drawer-item"
+            :class="{ active: route.path === m.path }"
+            @click="menuOpen = false"
+          >
+            {{ m.label }}
+          </router-link>
+        </nav>
+        <div class="drawer-foot">
+          <span class="muted">{{ auth.nickname }}</span>
+          <el-button size="small" plain @click="logout">退出登录</el-button>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -127,5 +157,96 @@ async function logout() {
 .content {
   flex: 1;
   padding: 24px;
+}
+
+/* ---------- 手机端菜单按钮（桌面隐藏） ---------- */
+.burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fff;
+  color: #4a5468;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  flex: none;
+}
+
+/* ---------- 抽屉菜单（浅色主题） ---------- */
+.drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.drawer-brand {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1d2740;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eef1f6;
+  margin-bottom: 10px;
+}
+.drawer-menu {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drawer-item {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #4a5468;
+  font-size: 15px;
+}
+.drawer-item.active {
+  background: #eaf2ff;
+  color: #2f7cf6;
+  font-weight: 500;
+}
+.drawer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1f6;
+}
+
+/* ---------- 手机 / 平板（≤900px）：侧边栏收起为抽屉 ---------- */
+@media (max-width: 900px) {
+  .side {
+    display: none;
+  }
+  .burger {
+    display: inline-flex;
+  }
+  .top {
+    height: 52px;
+    padding: 0 12px;
+    gap: 10px;
+  }
+  .top-tip {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .content {
+    padding: 14px 12px 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .top-tip {
+    display: none;
+  }
+  .top-right {
+    margin-left: auto;
+  }
 }
 </style>
