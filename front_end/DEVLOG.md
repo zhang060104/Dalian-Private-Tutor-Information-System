@@ -1,4 +1,4 @@
-# 前端开发日志（DEVLOG）
+﻿# 前端开发日志（DEVLOG）
 
 > 本项目日志只增不删。废弃重建会另起新段落说明，历史保留。
 
@@ -118,7 +118,7 @@ URL 平铺：`/directory` `/person/:role/:id` `/me` `/orders` `/order/:id` `/ord
 **mock 数据全部删除**
 - 删除 `src/data/mock.ts` 与 `src/data/mockApi.ts`（含种子用户/订单/状态机/一键填充演示账号）
 - 同步删除 Login.vue 的演示账号一键填充 tag，AdminLogin.vue tip 改为后端 seed 真实账号（超管
-  13800000000/123456，运营 13800000009/123456）
+  138****0000/******，运营 138****0009/******）
 
 **页面改造**（逐个切真实 API 并串联 captchaToken）
 - Login：删除演示一键填充，调 `auth.login(role, phone, password)`
@@ -132,7 +132,7 @@ URL 平铺：`/directory` `/person/:role/:id` `/me` `/orders` `/order/:id` `/ord
   全部以 `listRequests/resolveRequest/listAllOrders/getOrderAdmin/getUserAdmin/listAllUsers/...` 真实接入
 
 **后端 seed（演示账号）**
-- 学生：13900000001~03；教师：13800000001~03；超管：13800000000；运营：13800000009；密码 123456
+- 学生：139****0001~03；教师：138****0001~03；超管：138****0000；运营：138****0009；密码 ******
 - 教师 grade 已全 17（已毕业）以契合"大学生兼职/全职教师"语义
 
 **验证**

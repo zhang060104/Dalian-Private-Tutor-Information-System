@@ -1,4 +1,4 @@
-# 大连家教信息系统 · 后端 API 说明文档
+﻿# 大连家教信息系统 · 后端 API 说明文档
 
 - 后端框架：Spring Boot 3.5.16 + Java 21 + MyBatis + MySQL
 - 服务端口：**8083**（本地开发地址 `http://localhost:8083`）
@@ -42,8 +42,8 @@
 ```json
 {
   "role": "teacher",
-  "phone": "13800000001",
-  "password": "123456",
+  "phone": "138****0001",
+  "password": "******",
   "captchaToken": "滑块验证返回的token",
   "nickname": "王老师",
   "age": 28,
@@ -90,18 +90,18 @@
 `POST /api/auth/login` （匿名可访问）
 
 ```json
-{ "phone": "13800000001", "password": "123456", "role": "teacher" }
+{ "phone": "138****0001", "password": "******", "role": "teacher" }
 ```
 
 教师/学生响应 `data`：
 ```json
-{ "token": "xxx", "id": 1, "nickname": "王老师", "role": "teacher", "phone": "13800000001", "status": 0 }
+{ "token": "xxx", "id": 1, "nickname": "王老师", "role": "teacher", "phone": "138****0001", "status": 0 }
 ```
 `status`：0=已激活正常使用；1=入驻审核中（页面提示"资料审核中"，不开放列表/下单）。
 
 管理员响应 `data` 额外含 `isSuper`（1=超级管理员，可管理管理员账号）。
 
-内置账号（seed）：超管 `13800000000/123456`；运营管理员 `13800000009/123456`；教师 `13800000001~03/123456`；学生 `13900000001~03/123456`。
+内置账号（seed）：超管 `138****0000/******`；运营管理员 `138****0009/******`；教师 `138****0001~03/******`；学生 `139****0001~03/******`。
 
 ### 1.4 图片上传
 
@@ -326,11 +326,11 @@
   ```json
   { "role": "teacher", "id": 3, "credit": 95 }
   ```
-- 管理员账号管理（**仅超管**，seed 中 13800000000 为超管）：
+- 管理员账号管理（**仅超管**，seed 中 138****0000 为超管）：
   - `GET /api/admin/admins` —— 管理员列表
   - `POST /api/admin/admins` —— 新建管理员
     ```json
-    { "nickname": "运营2", "phone": "13800000010", "password": "123456" }
+    { "nickname": "运营2", "phone": "13800000010", "password": "******" }
     ```
   - `DELETE /api/admin/admins/{id}` —— 删除管理员；**id=0 初始超管不可删除**；非超管调用一律 400
 
