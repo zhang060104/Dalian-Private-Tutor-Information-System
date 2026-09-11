@@ -72,6 +72,78 @@ public class AdminController {
         return ApiResponse.ok(list);
     }
 
+    /**
+     * 用户完整档案（管理端）：基础资料全字段 + 订单统计 + 缴费凭证汇总 + 全部审核/操作记录。
+     * 供「信用分管理 → 查看」页一页展示该用户所有数据。
+     */
+    @GetMapping("/users/{role}/{id}")
+    public ApiResponse<Map<String, Object>> userArchive(@PathVariable String role, @PathVariable Integer id) {
+        String r = normalizeRole(role);
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("role", r);
+        res.put("id", id);
+
+        List<Order> orders;
+        if ("teacher".equals(r)) {
+            Teacher t = teacherMapper.findById(id);
+            if (t == null) throw new BizException("用户不存在");
+            t.setPassword(null);
+            res.put("profile", t);
+            orders = orderMapper.selectByTeacher(id);
+        } else {
+            Student s = studentMapper.findById(id);
+            if (s == null) throw new BizException("用户不存在");
+            s.setPassword(null);
+            res.put("profile", s);
+            orders = orderMapper.selectByStudent(id);
+        }
+
+        // 订单统计 + 缴费凭证汇总（含金额，便于管理员核对）
+        Set<Integer> orderIds = new HashSet<>();
+        int active = 0, closed = 0, infoFeeTotal = 0;
+        List<Map<String, Object>> vouchers = new ArrayList<>();
+        for (Order o : orders) {
+            orderIds.add(o.getId());
+            if (o.getStatus() != null && o.getStatus() == 12) closed++;
+            else active++;
+            if (o.getInfoFee() != null) infoFeeTotal += o.getInfoFee();
+
+            Map<String, Object> v = new LinkedHashMap<>();
+            v.put("orderId", o.getId());
+            v.put("status", o.getStatus());
+            v.put("verification", o.getVerification());
+            v.put("hourlyWage", o.getHourlyWage());
+            v.put("infoFee", o.getInfoFee());
+            v.put("depositImgTea", o.getDepositImgTea());
+            v.put("depositImgStu", o.getDepositImgStu());
+            v.put("infoFeeImg", o.getInfoFeeImg());
+            v.put("infoFeeQr", o.getInfoFeeQr());
+            v.put("createdAt", o.getCreatedAt());
+            vouchers.add(v);
+        }
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("orderTotal", orders.size());
+        stats.put("orderActive", active);
+        stats.put("orderClosed", closed);
+        stats.put("infoFeeTotal", infoFeeTotal);
+        // 定金为平台固定金额（学生/教师双方各 100 元），与前端 utils/order.ts 的 DEPOSIT_AMOUNT 保持一致
+        stats.put("depositAmount", 100);
+        res.put("stats", stats);
+        res.put("vouchers", vouchers);
+
+        // 相关审核/操作记录：本人资料/入驻类（type 0/1，tarId = 本人 id）+ 其订单业务类（type 2~5，tarId = 订单 id）
+        List<Map<String, Object>> logs = new ArrayList<>();
+        for (RequestLog log : requestLogMapper.selectAll()) {
+            Integer type = log.getType();
+            if (type == null || log.getTarId() == null) continue;
+            boolean mine = (type <= 1 && log.getTarId().equals(id))
+                    || (type >= 2 && orderIds.contains(log.getTarId()));
+            if (mine) logs.add(requestView(log));
+        }
+        res.put("logs", logs);
+        return ApiResponse.ok(res);
+    }
+
     @GetMapping("/orders")
     public ApiResponse<List<Map<String, Object>>> orders() {
         List<Map<String, Object>> out = new ArrayList<>();

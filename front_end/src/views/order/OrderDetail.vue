@@ -19,7 +19,7 @@ import {
 } from '@/api/orders'
 import { decodeSubjects } from '@/utils/subject'
 import { timetableSummary } from '@/utils/timetable'
-import { orderStatus, myActions } from '@/utils/order'
+import { orderStatus, myActions, DEPOSIT_AMOUNT } from '@/utils/order'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
 
 const route = useRoute()
@@ -38,6 +38,8 @@ const PAY_QRS = [
   { label: '微信支付', src: '/imgs/pay-wechat.jpg' },
   { label: '支付宝', src: '/imgs/pay-alipay.jpg' },
 ]
+
+/** 定金为平台固定金额：学生、教师各 100 元（定义见 utils/order.ts） */
 
 const actions = computed(() => (order.value ? myActions(order.value, role) : null))
 
@@ -89,19 +91,26 @@ function depositKinds(): {
     uploaded?: string
   }[]
   if (isStudent) {
-    list.push({ kind: 'stuDeposit', label: '学生定金', amount: o.hourlyWage, done: (o.verification & 2) === 2, uploaded: o.stuDepositImg })
+    list.push({ kind: 'stuDeposit', label: '学生定金', amount: DEPOSIT_AMOUNT, done: (o.verification & 2) === 2, uploaded: o.stuDepositImg })
   } else {
-    list.push({ kind: 'teaDeposit', label: '教师定金', amount: o.hourlyWage, done: (o.verification & 1) === 1, uploaded: o.teaDepositImg })
+    list.push({ kind: 'teaDeposit', label: '教师定金', amount: DEPOSIT_AMOUNT, done: (o.verification & 1) === 1, uploaded: o.teaDepositImg })
     list.push({
       kind: 'infoFee',
-      label: '信息费（首周）',
-      amount: o.infoFee || o.hourlyWage * 2,
+      label: '信息费',
+      amount: o.infoFee,
       done: (o.verification & 4) === 4,
       uploaded: o.infoFeeImg,
     })
   }
   return list
 }
+
+/** 我方待缴金额汇总：只列未完成项（定金固定 100，信息费取平台核算结果） */
+const payTodo = computed(() => {
+  const list = depositKinds().filter((k) => !k.done)
+  const total = list.reduce((sum, k) => sum + (k.amount || 0), 0)
+  return { list, total, has: list.length > 0 }
+})
 function openPay(kind: 'teaDeposit' | 'stuDeposit' | 'infoFee') {
   payKind.value = kind
   payFile.value = null
@@ -229,7 +238,8 @@ onMounted(async () => {
           </el-descriptions-item>
           <el-descriptions-item label="授课科目">{{ decodeSubjects(order.subject).join('、') || '—' }}</el-descriptions-item>
           <el-descriptions-item label="时薪">{{ order.hourlyWage }} 元/小时</el-descriptions-item>
-          <el-descriptions-item label="信息费(教师缴)">¥{{ order.infoFee || order.hourlyWage * 2 }}</el-descriptions-item>
+          <el-descriptions-item label="信息费(教师缴)">¥{{ order.infoFee }}</el-descriptions-item>
+          <el-descriptions-item label="定金(双方各)">¥{{ DEPOSIT_AMOUNT }}</el-descriptions-item>
           <el-descriptions-item label="授课时间" :span="2"><span class="tp">{{ timeText() }}</span></el-descriptions-item>
           <el-descriptions-item label="订单说明" :span="2">{{ order.description }}</el-descriptions-item>
           <el-descriptions-item v-if="order.visibleContact" label="对方联系方式" :span="2">
@@ -263,6 +273,19 @@ onMounted(async () => {
               <span style="font-size: 12px; color: #909399">{{ q.label }}</span>
             </div>
           </div>
+          <!-- 缴费金额提示（只列我方待缴项） -->
+          <div
+            v-if="payTodo.has"
+            style="margin-top: 12px; padding: 10px 12px; background: #fff; border: 1px solid #e6efff; border-radius: 8px; font-size: 13px; color: #303133"
+          >
+            <div style="font-weight: 600; margin-bottom: 4px">本次应付金额</div>
+            <div v-for="k in payTodo.list" :key="k.kind" style="line-height: 1.9">
+              · {{ k.label }}：<b style="color: #c4562c">¥{{ k.amount }}</b>
+            </div>
+            <div v-if="payTodo.list.length > 1" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #eef1f6">
+              合计：<b style="color: #c4562c; font-size: 15px">¥{{ payTodo.total }}</b>
+            </div>
+          </div>
         </div>
 
         <div class="pays">
@@ -287,7 +310,7 @@ onMounted(async () => {
             <div style="width: 110px; height: 110px; flex: none; border: 1px solid #eef1f6; border-radius: 8px; overflow: hidden">
               <el-image :src="order.infoFeeQr" :preview-src-list="[order.infoFeeQr]" preview-teleported fit="contain" style="width: 100%; height: 100%" />
             </div>
-            <div class="muted" style="font-size: 13px; line-height: 1.7">扫描平台收款码支付<b style="color:#e6a23c">信息费 ¥{{ order.infoFee || order.hourlyWage * 2 }}</b>，支付成功后截图上传核验（教师本人操作）</div>
+            <div class="muted" style="font-size: 13px; line-height: 1.7">扫描平台收款码支付<b style="color:#e6a23c">信息费 ¥{{ order.infoFee }}</b>，支付成功后截图上传核验（教师本人操作）</div>
           </div>
         </div>
         <div v-if="order.status === 6" class="trial-tip">

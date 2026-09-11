@@ -232,6 +232,45 @@ export async function getOrderAdmin(orderId: number): Promise<AdminOrderDetailVi
 }
 
 /** 该用户参与的全部订单（行级摘要） */
+// ---------- 用户完整档案（信用分管理 → 查看） ----------
+
+/** 缴费凭证行（按订单汇总，供管理端核对金额与凭证图） */
+export interface AdminVoucherRow {
+  orderId: number
+  status: number
+  verification: number
+  hourlyWage: number
+  infoFee?: number | null
+  depositImgTea?: string | null
+  depositImgStu?: string | null
+  infoFeeImg?: string | null
+  infoFeeQr?: string | null
+  createdAt?: string | null
+}
+
+/** GET /api/admin/users/{role}/{id}：基础资料全字段 + 统计 + 凭证 + 审核记录 */
+export interface AdminUserArchive {
+  role: 'student' | 'teacher'
+  id: number
+  /** 原始实体全字段（含手机号/资料图/时间表等，password 已置空） */
+  profile: Record<string, unknown>
+  stats: {
+    orderTotal: number
+    orderActive: number
+    orderClosed: number
+    infoFeeTotal: number
+    /** 定金固定金额（双方各 100 元） */
+    depositAmount: number
+  }
+  vouchers: AdminVoucherRow[]
+  logs: RequestDTO[]
+}
+
+/** 用户完整档案：管理端一页查看某用户的全部数据 */
+export async function getUserArchiveAdmin(role: 'student' | 'teacher', id: number): Promise<AdminUserArchive> {
+  return http.get<AdminUserArchive>(`/api/admin/users/${role}/${id}`)
+}
+
 export async function listOrdersForUserAdmin(role: 'student' | 'teacher', id: number): Promise<AdminOrderRow[]> {
   const all = await listAllOrders()
   return all.filter((o) => (role === 'student' ? o.studentId === id : o.teacherId === id))

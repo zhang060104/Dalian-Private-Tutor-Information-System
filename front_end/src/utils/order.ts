@@ -1,6 +1,9 @@
 // 订单状态机（0..12）—— 严格对齐《项目设计说明文档.md》order.status
 import type { Order } from '@/types'
 
+/** 定金：平台固定金额，学生 / 教师双方各 100 元（与订单状态机无关，缴费界面统一引用此处） */
+export const DEPOSIT_AMOUNT = 100
+
 export interface OrderStatusMeta {
   value: number
   /** 简短名称 */

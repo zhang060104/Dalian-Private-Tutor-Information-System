@@ -5,6 +5,7 @@ import { ElMessage, type UploadUserFile } from 'element-plus'
 import http from '@/api/http'
 import { getOrderAdmin, uploadInfoFeeQr, type AdminOrderDetailView } from '@/api/admin'
 import { timetableSummary } from '@/utils/timetable'
+import { DEPOSIT_AMOUNT } from '@/utils/order'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,10 +23,11 @@ function timeText(): string {
 }
 function feeItems(): { label: string; done: boolean }[] {
   const v = data.value!.verification
+  const info = data.value!.infoFee || 0
   return [
-    { label: '教师定金', done: (v & 1) === 1 },
-    { label: '学生定金', done: (v & 2) === 2 },
-    { label: '教师信息费', done: (v & 4) === 4 },
+    { label: `教师定金 ¥${DEPOSIT_AMOUNT}`, done: (v & 1) === 1 },
+    { label: `学生定金 ¥${DEPOSIT_AMOUNT}`, done: (v & 2) === 2 },
+    { label: `教师信息费 ¥${info}`, done: (v & 4) === 4 },
   ]
 }
 
