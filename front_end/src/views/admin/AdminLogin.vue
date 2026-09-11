@@ -37,9 +37,6 @@ async function submit() {
         </el-form-item>
         <el-button type="primary" size="large" class="btn" :loading="auth.loading" @click="submit">登 录</el-button>
       </el-form>
-      <el-alert type="info" :closable="false" class="tip">
-        超管 <b>13800000000</b> / <b>123456</b>　·　运营 <b>13800000009</b> / <b>123456</b>
-      </el-alert>
     </el-card>
   </div>
 </template>
@@ -69,8 +66,5 @@ async function submit() {
 }
 .btn {
   width: 100%;
-}
-.tip {
-  margin-top: 16px;
 }
 </style>
