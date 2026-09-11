@@ -350,6 +350,23 @@ export async function uploadInfoFeeQr(orderId: number, url: string): Promise<voi
   await http.post(`/api/admin/orders/${orderId}/info-fee-qr`, { url })
 }
 
+// ---------- 账号注销 / 恢复 / 彻底删除（清理脏数据） ----------
+
+/** 注销账号（软删除，status=-2）：不可登录、不进匹配池，订单历史保留 */
+export async function deactivateAccount(role: Role, id: number): Promise<void> {
+  await http.post(`/api/admin/accounts/${role}/${id}/deactivate`)
+}
+
+/** 恢复已注销账号：status=0，重新进入寻找列表 */
+export async function restoreAccount(role: Role, id: number): Promise<void> {
+  await http.post(`/api/admin/accounts/${role}/${id}/restore`)
+}
+
+/** 彻底删除账号（物理删除，仅超管）：会连带删除其名下全部订单，不可恢复 */
+export async function purgeAccount(role: Role, id: number): Promise<void> {
+  await http.delete(`/api/admin/accounts/${role}/${id}`)
+}
+
 // ---------- 本地工具 ----------
 
 function decodeSubjectsLocal(mask: number): string[] {

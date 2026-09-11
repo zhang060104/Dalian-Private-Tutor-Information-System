@@ -246,6 +246,61 @@ public class AdminController {
         return ApiResponse.ok(list);
     }
 
+    // ================= 账号注销 / 恢复 / 彻底删除（信用分管理页使用，便于清理脏数据）=================
+
+    /**
+     * 注销账号（软删除）：status -> -2。
+     * 影响：不能登录、不再进入任何匹配池（池查询只取 status=0）、令牌立即失效；订单与历史数据保留。
+     */
+    @PostMapping("/accounts/{role}/{id}/deactivate")
+    public ApiResponse<Void> deactivateAccount(@PathVariable String role, @PathVariable Integer id) {
+        String r = normalizeRole(role);
+        checkAccountExists(r, id);
+        setAccountStatus(r, id, -2);
+        return ApiResponse.ok();
+    }
+
+    /** 恢复已注销账号：status -> 0（重新进入寻找列表） */
+    @PostMapping("/accounts/{role}/{id}/restore")
+    public ApiResponse<Void> restoreAccount(@PathVariable String role, @PathVariable Integer id) {
+        String r = normalizeRole(role);
+        checkAccountExists(r, id);
+        setAccountStatus(r, id, 0);
+        return ApiResponse.ok();
+    }
+
+    /**
+     * 彻底删除账号（物理删除，仅超管）：用于清理测试/脏数据。
+     * 注意：订单表对 student/teacher 是 ON DELETE CASCADE，删除账号会**连带删除其名下全部订单**及关联明细，不可恢复。
+     */
+    @DeleteMapping("/accounts/{role}/{id}")
+    public ApiResponse<Void> purgeAccount(@PathVariable String role, @PathVariable Integer id,
+                                         @RequestAttribute(AuthInterceptor.ATTR_USER_ID) String userId) {
+        requireSuper(userId);
+        String r = normalizeRole(role);
+        checkAccountExists(r, id);
+        if ("teacher".equals(r)) teacherMapper.deleteById(id);
+        else studentMapper.deleteById(id);
+        return ApiResponse.ok();
+    }
+
+    private String normalizeRole(String role) {
+        if ("teacher".equals(role) || "student".equals(role)) return role;
+        throw new BizException("角色不合法");
+    }
+
+    private void checkAccountExists(String role, Integer id) {
+        boolean exists = "teacher".equals(role)
+                ? teacherMapper.findById(id) != null
+                : studentMapper.findById(id) != null;
+        if (!exists) throw new BizException("账号不存在");
+    }
+
+    private void setAccountStatus(String role, Integer id, int status) {
+        if ("teacher".equals(role)) teacherMapper.updateStatus(id, status);
+        else studentMapper.updateStatus(id, status);
+    }
+
     /** 创建管理员：仅超管（id=0 且 is_super=1） */
     @PostMapping("/admins")
     public ApiResponse<Admin> createAdmin(@RequestBody Map<String, String> body,

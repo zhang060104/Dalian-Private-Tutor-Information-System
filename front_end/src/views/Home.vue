@@ -35,6 +35,30 @@ function go() {
         </div>
       </div>
     </section>
+    <section class="roles">
+      <div class="container">
+        <h2>教师 / 学生，两种入口</h2>
+        <p class="roles-sub">实名认证 + 双向选择 + 定金保障，找家教和做家教都更省心。</p>
+        <div class="role-cards">
+          <div class="role-card">
+            <img src="/imgs/teacher-poster.png" alt="教师端海报" />
+            <div class="role-body">
+              <h3>我是老师</h3>
+              <p>发布可授科目与空闲时间，等待学生投递；试课满意再正式开课，平台保障结算。</p>
+              <el-button type="primary" round @click="router.push('/register')">教师入驻</el-button>
+            </div>
+          </div>
+          <div class="role-card">
+            <img src="/imgs/student-poster.png" alt="学生端海报" />
+            <div class="role-body">
+              <h3>我是学生</h3>
+              <p>按科目、年级、时间段筛选老师，首次免费试课，合适再继续，全程可评价。</p>
+              <el-button type="success" round @click="router.push('/register')">学生注册</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -127,5 +151,64 @@ function go() {
   font-size: 14px;
   color: #6b7488;
   line-height: 1.7;
+}
+.roles {
+  padding: 60px 0 70px;
+  background: linear-gradient(180deg, #f7faff 0%, #eef4ff 100%);
+}
+.roles h2 {
+  text-align: center;
+  font-size: 24px;
+  color: #1d2740;
+  margin-bottom: 10px;
+}
+.roles-sub {
+  text-align: center;
+  color: #6b7488;
+  font-size: 14.5px;
+  margin-bottom: 32px;
+}
+.role-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.role-card {
+  display: flex;
+  gap: 20px;
+  background: #fff;
+  border: 1px solid #eef1f6;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 6px 20px rgba(47, 124, 246, 0.06);
+}
+.role-card img {
+  width: 150px;
+  height: 267px;
+  object-fit: contain;
+  background: #f7faff;
+  border-radius: 12px;
+  flex: 0 0 auto;
+}
+.role-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.role-body h3 {
+  font-size: 17px;
+  color: #1d2740;
+  margin-bottom: 10px;
+}
+.role-body p {
+  font-size: 14px;
+  color: #6b7488;
+  line-height: 1.8;
+  margin-bottom: 18px;
+}
+@media (max-width: 820px) {
+  .role-cards {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

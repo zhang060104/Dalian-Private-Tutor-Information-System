@@ -63,6 +63,9 @@ public class AuthController {
                 if (t.getStatus() != null && t.getStatus() == -1) {
                     throw new BizException("账号正在等待管理员审核，暂不可登录");
                 }
+                if (t.getStatus() != null && t.getStatus() == -2) {
+                    throw new BizException("账号已被注销，如需恢复请联系平台管理员");
+                }
                 r.put("token", TokenUtil.issue(t.getId(), "teacher", ttlHours, secret));
                 r.put("id", t.getId());
                 r.put("nickname", t.getNickname());
@@ -77,6 +80,9 @@ public class AuthController {
                 }
                 if (s.getStatus() != null && s.getStatus() == -1) {
                     throw new BizException("账号正在等待管理员审核，暂不可登录");
+                }
+                if (s.getStatus() != null && s.getStatus() == -2) {
+                    throw new BizException("账号已被注销，如需恢复请联系平台管理员");
                 }
                 r.put("token", TokenUtil.issue(s.getId(), "student", ttlHours, secret));
                 r.put("id", s.getId());
