@@ -133,6 +133,48 @@ Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
 
 `server_name _` 为默认服务器，接受任意 Host；前端构建产物全部使用相对路径（已核对 dist 无 `localhost` 硬编码），因此换域名/加子域名后无需重新构建。
 
+---
+
+## 4.5 本机常驻运行方式（守护进程 + 开机自启，2026-09-11 建立）
+
+生产运行不走 `mvn spring-boot:run`（那是开发方式），而是：**构建 jar → 用守护脚本以脱离会话的隐藏进程运行**。
+
+```
+登录时（启动文件夹 Tinker-Services.vbs）
+   ├── start-backend.cmd  ── 守卫(8083 已在监听则跳过) → java -jar …/dalian-tutor-back-*.jar → 退出即重启
+   ├── start-nginx.cmd    ── 守卫(nginx.exe 存活则跳过) → nginx.exe → 退出即重启
+   └── run-tunnel.cmd     ── 守卫(cloudflared 存活则跳过) → cloudflared --protocol http2 → 退出即重启
+```
+
+| 文件 | 作用 |
+| --- | --- |
+| `C:\Users\Administrator\.tinker\start-backend.cmd` | 后端守护（读 `db_password.txt` 注入 `DB_PASSWORD`；`-Xms128m -Xmx768m`） |
+| `C:\Users\Administrator\.tinker\start-nginx.cmd` | nginx 守护 |
+| `C:\Users\Administrator\.cloudflared\run-tunnel.cmd` | tunnel 守护（强制 http2：本机出网 QUIC 7844 被封） |
+| `C:\Users\Administrator\.tinker\start-all.vbs` | 隐藏启动上面三者（幂等） |
+| `启动文件夹\Tinker-Services.vbs` | 登录自启入口（指向 start-all.vbs） |
+| `C:\Users\Administrator\.tinker\db_password.txt` | 数据库密码（ACL 已收紧为仅 Administrator；**绝不入库/入仓**） |
+| `C:\Users\Administrator\.tinker\logs\backend.log` / `logs\nginx.log`、`%TEMP%\cloudflared_tunnel.log` | 运行日志 |
+
+要点与坑：
+
+- **必须用 VBS/WMI 之类方式让进程脱离终端会话**：用普通 `Start-Process` 或后台会话启动的进程，会在会话回收时被连带杀掉（2026-09-11 事故：cloudflared 运行满 10 分钟后被杀 → Cloudflare Error 1033）。当前进程链为 `xxx ← cmd(守护) ← wscript(已退出)`，不受会话影响。
+- 守护脚本**幂等**：重复启动不会产生第二个实例（先检测再启动）。
+- 手工启停：
+  ```powershell
+  # 启动全部（隐藏、脱离会话）
+  Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine = 'wscript.exe "C:\Users\Administrator\.tinker\start-all.vbs"' }
+  # 只重启后端：杀掉 java 进程即可，守护会在 30s 内自动拉起
+  Get-NetTCPConnection -LocalPort 8083 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+  # 只重启 nginx：注意 Windows 版是 1 个 master + N 个 worker，需全部结束
+  Get-Process nginx | Stop-Process -Force
+  ```
+- 更新后端代码后：`mvn -DskipTests package` 重新出 jar → 杀掉 java 进程，守护会自动加载新 jar。
+- 本机**没有管理员权限**，因此无法注册 Windows 服务或计划任务（`Register-ScheduledTask` 返回 0x80070005）；启动文件夹方案是当前权限下的等价替代。
+- 自愈能力已验证：手动杀掉后端进程，**13 秒**内被守护自动拉起。
+
+
 
 ---
 
