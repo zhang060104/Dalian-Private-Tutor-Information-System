@@ -38,8 +38,11 @@ export interface RequestDTO {
 export async function listRequests(opts?: {
   type?: RequestType
   pending?: boolean
+  /** silent：静默模式，失败不弹全局提示（后台轮询用；不进入查询参数） */
+  silent?: boolean
 }): Promise<RequestDTO[]> {
-  return http.get<RequestDTO[]>('/api/admin/requests', { params: opts || {} })
+  const { silent, ...params } = opts || {}
+  return http.get<RequestDTO[]>('/api/admin/requests', { params, silent })
 }
 
 /** 处理一条待办 */

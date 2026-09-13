@@ -30,12 +30,13 @@ function clearAuthAndRedirect() {
   }
 }
 
-/** 统一请求：解包 code/data，弹业务错，401 清登录 */
+/** 统一请求：解包 code/data，业务错误与 401 统一处理 */
 async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string, opts?: {
   data?: unknown
   params?: Record<string, unknown>
   headers?: Record<string, string>
-  raw?: boolean // true 时直接返回 data（兼容文件上传等非信封响应）
+  raw?: boolean // true 时直接返回 data，用于文件上传等非包装响应
+  silent?: boolean // true 时失败不弹全局错误提示（后台轮询等静默任务用），401 仍会正常跳登录
 }): Promise<T> {
   try {
     const cfg: AxiosRequestConfig = {
@@ -54,7 +55,7 @@ async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string
     if (body.code === 0) return body.data
     if (body.code === 401) clearAuthAndRedirect()
     const msg = body.message || `请求失败（${body.code}）`
-    ElMessage.error(msg)
+    if (!opts?.silent) ElMessage.error(msg)
     throw new Error(msg)
   } catch (e) {
     if (e instanceof Error) throw e
@@ -68,9 +69,9 @@ async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string
       } else if (status && status >= 500) {
         msg = '服务器异常，请稍后重试'
       } else if (err.code === 'ECONNABORTED') {
-        msg = '请求超时，请检查网络或后端是否运行'
+        msg = '请求超时，请检查网络是否正常'
       }
-      ElMessage.error(msg)
+      if (!opts?.silent) ElMessage.error(msg)
       throw new Error(msg)
     }
     throw e
@@ -78,13 +79,13 @@ async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string
 }
 
 const http = {
-  get: <T>(url: string, opts?: { params?: Record<string, unknown> }) =>
+  get: <T>(url: string, opts?: { params?: Record<string, unknown>; silent?: boolean }) =>
     request<T>('get', url, opts),
-  post: <T>(url: string, data?: unknown, opts?: { headers?: Record<string, string>; raw?: boolean }) =>
+  post: <T>(url: string, data?: unknown, opts?: { headers?: Record<string, string>; raw?: boolean; silent?: boolean }) =>
     request<T>('post', url, { data, ...(opts || {}) }),
-  put: <T>(url: string, data?: unknown, opts?: { headers?: Record<string, string> }) =>
+  put: <T>(url: string, data?: unknown, opts?: { headers?: Record<string, string>; silent?: boolean }) =>
     request<T>('put', url, { data, ...(opts || {}) }),
-  delete: <T>(url: string, opts?: { params?: Record<string, unknown> }) =>
+  delete: <T>(url: string, opts?: { params?: Record<string, unknown>; silent?: boolean }) =>
     request<T>('delete', url, opts),
 }
 

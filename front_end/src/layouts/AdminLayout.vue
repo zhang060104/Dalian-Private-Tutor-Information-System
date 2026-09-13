@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Menu } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useAdminTodo } from '@/composables/useAdminTodo'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,6 +26,31 @@ const menus = [
   { path: '/admin/admins', label: '管理员管理' },
 ]
 
+// ---------- 待办红标：数据来自 useAdminTodo（轮询只在待办概览页跑） ----------
+const { counts: todoCounts, refreshTodo } = useAdminTodo()
+
+/** 路径 -> 待处理数量；>0 的栏目侧栏标红（红底白字） */
+const alertCounts = computed<Record<string, number>>(() => {
+  const m: Record<string, number> = {}
+  if (todoCounts.value.user > 0) m['/admin/users'] = todoCounts.value.user
+  if (todoCounts.value.payment > 0) m['/admin/payments'] = todoCounts.value.payment
+  if (todoCounts.value.arbit > 0) m['/admin/arbitrations'] = todoCounts.value.arbit
+  return m
+})
+
+/**
+ * 后台页面间跳转时静默校正一次待办计数：
+ * 轮询只在待办概览页进行，但审核/核验/仲裁页处理完待办后，
+ * 侧栏红标要能跟着消失，所以每次切页补一次静默查询（非轮询，失败不弹提示）。
+ */
+watch(
+  () => route.path,
+  (p) => {
+    if (p === '/admin' || p === '/admin/dashboard') return
+    void refreshTodo()
+  },
+)
+
 async function logout() {
   await auth.logout()
   ElMessage.success('已退出')
@@ -40,8 +66,15 @@ async function logout() {
     <aside class="side">
       <div class="side-brand">家教中心后台</div>
       <nav class="menu">
-        <router-link v-for="m in menus" :key="m.path" :to="m.path" class="menu-item" :class="{ active: route.path === m.path }">
+        <router-link
+          v-for="m in menus"
+          :key="m.path"
+          :to="m.path"
+          class="menu-item"
+          :class="{ active: route.path === m.path, alert: (alertCounts[m.path] || 0) > 0 }"
+        >
           {{ m.label }}
+          <span v-if="alertCounts[m.path]" class="menu-badge">{{ alertCounts[m.path] }}</span>
         </router-link>
       </nav>
     </aside>
@@ -71,10 +104,11 @@ async function logout() {
             :key="m.path"
             :to="m.path"
             class="drawer-item"
-            :class="{ active: route.path === m.path }"
+            :class="{ active: route.path === m.path, alert: (alertCounts[m.path] || 0) > 0 }"
             @click="menuOpen = false"
           >
             {{ m.label }}
+            <span v-if="alertCounts[m.path]" class="menu-badge">{{ alertCounts[m.path] }}</span>
           </router-link>
         </nav>
         <div class="drawer-foot">
@@ -129,6 +163,31 @@ async function logout() {
   color: #fff;
   border-left-color: #2f7cf6;
   font-weight: 500;
+}
+/* ---------- 待处理红标：红底白字（需覆盖 active/hover） ---------- */
+.menu-item.alert,
+.menu-item.alert:hover {
+  background: #e63946;
+  color: #fff;
+  font-weight: 600;
+}
+.menu-item.alert.active {
+  background: #c1121f;
+  color: #fff;
+  border-left-color: #fff;
+}
+.menu-badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #fff;
+  color: #e63946;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  text-align: center;
 }
 .main {
   flex: 1;
@@ -207,6 +266,16 @@ async function logout() {
   background: #eaf2ff;
   color: #2f7cf6;
   font-weight: 500;
+}
+/* ---------- 抽屉待处理红标 ---------- */
+.drawer-item.alert {
+  background: #e63946;
+  color: #fff;
+  font-weight: 600;
+}
+.drawer-item.alert.active {
+  background: #c1121f;
+  color: #fff;
 }
 .drawer-foot {
   display: flex;
